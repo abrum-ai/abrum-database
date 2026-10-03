@@ -25,7 +25,19 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
@@ -63,7 +75,10 @@ const LAYOUT_ICONS: Record<Layout, React.ComponentType<{ className?: string }>> 
 /** Loads the rows of a related table and reports them upward. */
 function RelatedSource({ tableKey, onRows }: { tableKey: string; onRows: (tableKey: string, rows: StoredRow[]) => void }) {
   const { rows } = useTableRows(tableKey);
-  React.useEffect(() => onRows(tableKey, rows), [tableKey, rows, onRows]);
+  // Report only real content changes; an identity change alone must not
+  // re-render the parent (that loop crashed tables with relations).
+  const signature = rows.map((row) => `${row.id}:${row.updatedAtMs}`).join("|");
+  React.useEffect(() => onRows(tableKey, rows), [tableKey, signature, onRows]); // eslint-disable-line react-hooks/exhaustive-deps
   return null;
 }
 
@@ -265,6 +280,13 @@ export function TableWorkspace({ db, tableKey, canWrite }: { db: Database; table
       ))}
       <div className="flex min-h-0 flex-1 flex-col">
         <ViewTabs
+          action={
+            canWrite ? (
+              <Button size="sm" onClick={() => setNewItem({ open: true, defaults: {} })} disabled={columns.length === 0}>
+                <Plus /> New {itemName}
+              </Button>
+            ) : null
+          }
           views={views}
           active={view.key}
           canWrite={canWrite}
@@ -304,58 +326,55 @@ export function TableWorkspace({ db, tableKey, canWrite }: { db: Database; table
           <FilterMenu columns={all} config={view.config} onChange={changeView} />
           <SortMenu columns={all} sorts={sorts} onChange={(next) => changeView({ ...view.config, sorts: next })} />
           <PropertiesMenu view={view} columns={columns} canWrite={canWrite} onChange={changeView} onAdd={() => setColumnDialog({ open: true, column: null })} />
-          {view.layout === "board" ? (
-            <LayoutOption
-              label="Group by"
-              value={view.config.groupBy}
-              options={columns.filter((column) => ["select", "person", "checkbox"].includes(column.type))}
-              onChange={(groupBy) => changeView({ ...view.config, groupBy })}
-            />
+          {data.isLoadingMore ? (
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="size-3.5 animate-spin" /> Loading {data.rows.length.toLocaleString()}…
+            </span>
           ) : null}
-          {view.layout === "board" || view.layout === "gallery" ? (
-            <LayoutOption
-              label="Cover"
-              value={view.config.cover ?? (view.layout === "gallery" ? imageColumn(columns)?.key : undefined)}
-              options={columns.filter((column) => column.type === "image")}
-              allowNone
-              onChange={(cover) => changeView({ ...view.config, cover })}
-            />
-          ) : null}
-
-          <div className="ml-auto flex items-center gap-2">
-            {data.isLoadingMore ? (
-              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Loader2 className="size-3.5 animate-spin" /> Loading {data.rows.length.toLocaleString()}…
-              </span>
-            ) : null}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <FileDown /> Export
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>{selectedIds.length ? `${selectedIds.length} selected` : `${visibleRows.length} in view`}</DropdownMenuLabel>
-                <DropdownMenuItem onSelect={() => download(`${fileBase}.csv`, toCsv(shown, exportRows.map((row) => row.values), computed.titles), "text/csv;charset=utf-8")}>CSV (visible properties)</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => download(`${fileBase}.json`, JSON.stringify(toJsonRows(columns, exportRows, computed.titles), null, 2), "application/json")}>
-                  JSON (all properties and pages)
-                </DropdownMenuItem>
-                {canWrite ? (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onSelect={() => setImportOpen(true)}>
-                      <FileUp /> Import CSV…
-                    </DropdownMenuItem>
-                  </>
-                ) : null}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            {canWrite ? (
-              <Button size="sm" onClick={() => setNewItem({ open: true, defaults: {} })} disabled={columns.length === 0}>
-                <Plus /> New {itemName}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon" className="ml-auto size-8" aria-label="More view options">
+                <MoreHorizontal />
               </Button>
-            ) : null}
-          </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              {view.layout === "board" ? (
+                <OptionSubmenu
+                  label="Group by"
+                  value={view.config.groupBy ?? columns.find((column) => column.type === "select" || column.type === "person")?.key}
+                  options={columns.filter((column) => ["select", "person", "checkbox"].includes(column.type))}
+                  onChange={(groupBy) => changeView({ ...view.config, groupBy })}
+                />
+              ) : null}
+              {view.layout === "board" || view.layout === "gallery" ? (
+                <OptionSubmenu
+                  label="Cover"
+                  value={view.config.cover ?? (view.layout === "gallery" ? imageColumn(columns)?.key : undefined)}
+                  options={columns.filter((column) => column.type === "image")}
+                  allowNone
+                  onChange={(cover) => changeView({ ...view.config, cover })}
+                />
+              ) : null}
+              {view.layout === "board" || view.layout === "gallery" ? <DropdownMenuSeparator /> : null}
+              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                Export {selectedIds.length ? `${selectedIds.length} selected` : `${visibleRows.length} in view`}
+              </DropdownMenuLabel>
+              <DropdownMenuItem onSelect={() => download(`${fileBase}.csv`, toCsv(shown, exportRows.map((row) => row.values), computed.titles), "text/csv;charset=utf-8")}>
+                <FileDown /> Export CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => download(`${fileBase}.json`, JSON.stringify(toJsonRows(columns, exportRows, computed.titles), null, 2), "application/json")}>
+                <FileDown /> Export JSON
+              </DropdownMenuItem>
+              {canWrite ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => setImportOpen(true)}>
+                    <FileUp /> Import CSV…
+                  </DropdownMenuItem>
+                </>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {selectedIds.length > 0 ? (
@@ -436,6 +455,7 @@ export function TableWorkspace({ db, tableKey, canWrite }: { db: Database; table
 }
 
 function ViewTabs({
+  action,
   views,
   active,
   canWrite,
@@ -446,6 +466,7 @@ function ViewTabs({
   onDelete,
   onLayout,
 }: {
+  action: React.ReactNode;
   views: ViewDef[];
   active: string;
   canWrite: boolean;
@@ -534,6 +555,7 @@ function ViewTabs({
           </DropdownMenu>
         </>
       ) : null}
+      {action ? <div className="ml-auto shrink-0 py-1 pl-2">{action}</div> : null}
     </div>
   );
 }
@@ -784,23 +806,24 @@ function PropertiesMenu({ view, columns, canWrite, onChange, onAdd }: { view: Vi
   );
 }
 
-function LayoutOption({ label, value, options, allowNone, onChange }: { label: string; value?: string; options: ColumnDef[]; allowNone?: boolean; onChange: (value: string | undefined) => void }) {
+function OptionSubmenu({ label, value, options, allowNone, onChange }: { label: string; value?: string; options: ColumnDef[]; allowNone?: boolean; onChange: (value: string | undefined) => void }) {
+  const current = options.find((column) => column.key === value);
   return (
-    <div className="flex h-8 items-center overflow-hidden rounded-md border text-sm shadow-xs">
-      <span className="px-2.5 text-muted-foreground">{label}</span>
-      <Select value={value ?? "__none"} onValueChange={(next) => onChange(next === "__none" ? undefined : next)}>
-        <SelectTrigger size="sm" className="h-8 rounded-l-none border-0 border-l shadow-none">
-          <SelectValue placeholder="None" />
-        </SelectTrigger>
-        <SelectContent>
-          {allowNone || options.length === 0 ? <SelectItem value="__none">None</SelectItem> : null}
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger>
+        <span className="flex-1">{label}</span>
+        <span className="max-w-24 truncate text-xs text-muted-foreground">{current?.label ?? "None"}</span>
+      </DropdownMenuSubTrigger>
+      <DropdownMenuSubContent className="w-48">
+        <DropdownMenuRadioGroup value={value ?? "__none"} onValueChange={(next) => onChange(next === "__none" ? undefined : next)}>
+          {allowNone || options.length === 0 ? <DropdownMenuRadioItem value="__none">None</DropdownMenuRadioItem> : null}
           {options.map((column) => (
-            <SelectItem key={column.key} value={column.key}>
+            <DropdownMenuRadioItem key={column.key} value={column.key}>
               {column.label}
-            </SelectItem>
+            </DropdownMenuRadioItem>
           ))}
-        </SelectContent>
-      </Select>
-    </div>
+        </DropdownMenuRadioGroup>
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
   );
 }

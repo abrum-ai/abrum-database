@@ -12,12 +12,20 @@ type EntityName = "table" | "column" | "view" | "row";
 
 /** Every record of an entity (optionally filtered), loading 500 per page until done. */
 function useAll<Name extends EntityName>(entity: Name, where?: Record<string, unknown>) {
-  const query = useAbrumInfiniteEntityList(app, entity, {
-    ...(where ? { where: where as never } : {}),
-    order: ["createdAtMs", "asc"],
-    pageSize: PAGE_SIZE,
-    realtimeRefreshDelayMs: 150,
-  } as never);
+  // The query hook keys its record projection on option identity: keep the
+  // options object stable across renders, or every render yields new rows.
+  const whereKey = JSON.stringify(where ?? null);
+  const options = React.useMemo(
+    () => ({
+      ...(where ? { where: where as never } : {}),
+      order: ["createdAtMs", "asc"],
+      pageSize: PAGE_SIZE,
+      realtimeRefreshDelayMs: 150,
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [whereKey],
+  );
+  const query = useAbrumInfiniteEntityList(app, entity, options as never);
   const { hasMore, isLoading, isLoadingMore, loadMore } = query;
   React.useEffect(() => {
     if (hasMore && !isLoading && !isLoadingMore) void loadMore().catch(() => undefined);
