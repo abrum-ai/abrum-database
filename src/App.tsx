@@ -1,7 +1,5 @@
 import React from "react";
-import { AbrumAppShell, AbrumAppReady, processAffordance, useAbrumCanWrite, useAbrumMutations } from "@abrum/react";
-import { app } from "@abrum/generated";
-import type { JsonValue } from "@abrum/web-runtime";
+import { AbrumAppShell, AbrumAppReady, processAffordance, useAbrumCanWrite } from "@abrum/react";
 import { Loader2, MoreHorizontal, Pencil, Plus, Table2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -10,9 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { newRowId, type ColumnDef } from "@/lib/columns";
+import type { ColumnDef } from "@/lib/columns";
 import { useRows, useTables } from "@/lib/data";
-import { TEMPLATES, templateRows, type Template } from "@/lib/templates";
+import { TEMPLATES, type Template } from "@/lib/templates";
 import { ColumnDialog, type ColumnDraft } from "@/components/column-dialog";
 import { DataTable } from "@/components/data-table";
 import { ItemSheet, NewItemDialog } from "@/components/item-forms";
@@ -20,17 +18,12 @@ import { ItemSheet, NewItemDialog } from "@/components/item-forms";
 export function App() {
   const data = useTables();
   const canWrite = useAbrumCanWrite();
-  const mutations = useAbrumMutations(app);
   const [activeKey, setActiveKey] = React.useState<string | null>(null);
   const [newTableOpen, setNewTableOpen] = React.useState(false);
   const active = data.tables.find((table) => table.key === activeKey) ?? data.tables[0] ?? null;
 
   async function createFromTemplate(template: Template, name: string) {
     const created = await data.createTable({ name, itemName: template.itemName, columns: template.columns });
-    const now = Date.now();
-    for (const [index, values] of templateRows(template, created.columnKeys).entries()) {
-      await mutations.row.create({ tableKey: created.key, id: newRowId(), values: values as JsonValue, createdAtMs: now + index, updatedAtMs: now });
-    }
     setActiveKey(created.key);
   }
 

@@ -139,7 +139,7 @@ export type RowRecord = AbrumEntityRecord<(typeof tableApp.entities)["row"]>;
 export const tableInstallManifest: AbrumInstallAppOptions = {
   "appId": "abrum.table",
   "title": "Table",
-  "icon": "table",
+  "icon": "database",
   "description": "Dynamic tables stored as signed twins. People and agents can define columns, add rows, search, filter, sort and export.",
   "kind": "web",
   "appVersion": "0.1.0",

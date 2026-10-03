@@ -15,8 +15,8 @@
     "prebuild": "abrum-app generate",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
-    "preview:ui": "vite --config preview/vite.config.ts",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "sync:abrum": "node scripts/sync-to-abrum.mjs"
   },
   "dependencies": {
     "@abrum/react": "file:vendor/abrum-sdk/abrum-react-0.1.1.tgz",
@@ -28,9 +28,8 @@
     "@vitejs/plugin-react": "^5.1.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "cn": "^0.4.0",
-    "lucide-react": "^1.51.0",
-    "radix-ui": "^1.6.7",
+    "lucide-react": "^0.552.0",
+    "radix-ui": "~1.5.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "tailwind-merge": "^3.7.0",

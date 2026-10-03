@@ -10,7 +10,7 @@ const TABLE_REF = "Table key (e.g. \"companies\") or exact table name.";
 export default defineApp({
   id: "abrum.table",
   title: "Table",
-  icon: "table",
+  icon: "database",
   description: "Dynamic tables stored as signed twins. People and agents can define columns, add rows, search, filter, sort and export.",
   entities: {
     // One table (shown as a tab). `key` is the stable, agent-friendly id.
