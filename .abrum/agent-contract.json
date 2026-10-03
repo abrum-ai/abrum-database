@@ -1,0 +1,32 @@
+{
+  "contractVersion": 2,
+  "appId": "abrum.table",
+  "title": "Table",
+  "devPort": 5188,
+  "backend": "js",
+  "recipe": "tracker",
+  "editableFiles": [
+    "abrum.app.ts",
+    "src/App.tsx",
+    "src/styles.css",
+    "backend/actions.js"
+  ],
+  "managedFiles": [
+    "abrum.app.json",
+    "generated/",
+    "package.json",
+    "vite.config.ts",
+    "src/main.tsx",
+    "vendor/abrum-sdk/"
+  ],
+  "checkCommand": "abrum app check --app .",
+  "runTool": "app_run",
+  "provisionTool": "app_provision",
+  "verificationTools": [
+    "copresence.view",
+    "copresence.request",
+    "copresence.act",
+    "copresence.waitFor",
+    "copresence.frame"
+  ]
+}

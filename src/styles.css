@@ -1,0 +1,102 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "@abrum/react/tailwind.css";
+
+@source "./";
+
+/* shadcn/ui tokens derive from the ABRUM theme, so the table follows the
+   host's light/dark scheme (data-abrum-scheme or prefers-color-scheme). */
+:root {
+  --background: var(--abrum-bg);
+  --foreground: var(--abrum-fg);
+  --card: var(--abrum-surface);
+  --card-foreground: var(--abrum-fg);
+  --popover: var(--abrum-surface);
+  --popover-foreground: var(--abrum-fg);
+  --primary: var(--abrum-primary);
+  --primary-foreground: var(--abrum-primary-fg);
+  --secondary: var(--abrum-surface-muted);
+  --secondary-foreground: var(--abrum-fg);
+  --muted: var(--abrum-surface-muted);
+  --muted-foreground: var(--abrum-fg-muted);
+  --accent: var(--abrum-surface-muted);
+  --accent-foreground: var(--abrum-fg);
+  --destructive: var(--abrum-danger);
+  --border: var(--abrum-border);
+  --input: var(--abrum-border);
+  --ring: var(--abrum-border-focus);
+  --radius: var(--abrum-radius-md);
+}
+
+@custom-variant dark (&:is([data-abrum-scheme="dark"] *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 4px);
+  --radius-xl: calc(var(--radius) + 8px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    margin: 0;
+    font: var(--abrum-type-body);
+    color: var(--foreground);
+    background: var(--background);
+  }
+}
+
+/* Segmented meter used by percent columns (table cell, form and details). */
+.meter {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 2px;
+  height: 12px;
+}
+.meter > i {
+  border-radius: 1.5px;
+  background: color-mix(in srgb, var(--abrum-fg) 10%, transparent);
+}
+.meter > i[data-on="low"] { background: #e5686b; }
+.meter > i[data-on="mid"] { background: #e9b949; }
+.meter > i[data-on="high"] { background: #4cb86a; }
+
+.trend {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 16px;
+}
+.trend > i {
+  width: 4px;
+  min-height: 2px;
+  border-radius: 1px;
+  background: #4cb86a;
+}
