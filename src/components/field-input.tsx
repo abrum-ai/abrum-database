@@ -1,6 +1,6 @@
 import React from "react";
 import { useAbrum } from "@abrum/react";
-import { Building2, Check, Loader2, Upload, X } from "lucide-react";
+import { Building2, Check, FileText, Loader2, Search, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -10,8 +10,9 @@ import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { toDisplayNumber, toStoredNumber, type ColumnDef } from "@/lib/columns";
-import { ImageThumb, Initials, Meter, OptionBadge, Stars } from "./cells";
+import { isComputed, toDisplayNumber, toStoredNumber, type ColumnDef } from "@/lib/columns";
+import { useTableContext } from "@/lib/table-context";
+import { CellView, ImageThumb, Initials, Meter, OptionBadge, Stars } from "./cells";
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const NONE = "__none__";
@@ -21,6 +22,14 @@ type FieldProps = { column: ColumnDef; value: unknown; onChange: (value: unknown
 /** Editable control for one column. Values are always the stored form. */
 export function FieldInput({ column, value, onChange, invalid }: FieldProps) {
   const id = `field-${column.key}`;
+  if (isComputed(column)) {
+    return (
+      <div id={id} className="flex min-h-9 items-center rounded-md border border-dashed px-3 text-sm text-muted-foreground">
+        <CellView column={column} value={value} />
+      </div>
+    );
+  }
+  if (column.type === "relation") return <RelationField column={column} value={value} onChange={onChange} invalid={invalid} />;
   const common = { id, "aria-invalid": invalid || undefined, placeholder: column.config.placeholder };
   switch (column.type) {
     case "longText":
@@ -32,7 +41,10 @@ export function FieldInput({ column, value, onChange, invalid }: FieldProps) {
       const number = typeof value === "number" ? value : 0;
       return (
         <div className="grid gap-3">
-          <Slider id={id} value={[number]} min={0} max={100} step={1} onValueChange={([next]) => onChange(next)} />
+          <div className="flex items-center gap-3">
+            <Slider id={id} value={[number]} min={0} max={100} step={1} onValueChange={([next]) => onChange(next)} />
+            <span className="w-10 text-right text-sm tabular-nums">{number}%</span>
+          </div>
           <Meter value={number} segments={40} />
         </div>
       );
@@ -173,6 +185,59 @@ function MultiSelectField({ column, value, onChange, invalid }: FieldProps) {
   );
 }
 
+function RelationField({ column, value, onChange, invalid }: FieldProps) {
+  const { relatedOptions, titles, tableName } = useTableContext();
+  const [query, setQuery] = React.useState("");
+  const selected = Array.isArray(value) ? value.map(String) : [];
+  const options = relatedOptions(column.config.tableKey);
+  const visible = options.filter((option) => option.title.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 200);
+  const toggle = (id: string) => {
+    if (column.config.single) onChange(selected[0] === id ? [] : [id]);
+    else onChange(selected.includes(id) ? selected.filter((item) => item !== id) : [...selected, id]);
+  };
+  return (
+    <Popover onOpenChange={(open) => !open && setQuery("")}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          id={`field-${column.key}`}
+          aria-invalid={invalid || undefined}
+          className="flex min-h-9 w-full flex-wrap items-center gap-1.5 rounded-md border border-input bg-transparent px-2 py-1.5 text-left text-sm shadow-xs aria-invalid:border-destructive"
+        >
+          {selected.length === 0 ? <span className="px-1 text-muted-foreground">Link {tableName(column.config.tableKey)}…</span> : null}
+          {selected.map((id) => (
+            <span key={id} className="inline-flex h-6 items-center gap-1 rounded-md bg-muted px-2 text-xs">
+              <FileText className="size-3 text-muted-foreground" />
+              {titles(column.config.tableKey, id) ?? "Missing row"}
+            </span>
+          ))}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-0" align="start">
+        <div className="flex items-center gap-2 border-b px-2">
+          <Search className="size-4 text-muted-foreground" />
+          <input
+            autoFocus
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={`Search ${tableName(column.config.tableKey)}…`}
+            className="h-9 w-full bg-transparent text-sm outline-none"
+          />
+        </div>
+        <div className="max-h-64 overflow-y-auto p-1">
+          {visible.length === 0 ? <p className="p-2 text-sm text-muted-foreground">{options.length ? "No matching rows." : "The related table has no rows yet."}</p> : null}
+          {visible.map((option) => (
+            <button key={option.id} type="button" className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent" onClick={() => toggle(option.id)}>
+              <span className="grid size-4 shrink-0 place-items-center">{selected.includes(option.id) ? <Check className="size-4" /> : null}</span>
+              <span className="truncate">{option.title}</span>
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function ImageField({ column, value, onChange }: FieldProps) {
   const runtime = useAbrum();
   const input = React.useRef<HTMLInputElement>(null);
@@ -239,7 +304,6 @@ export function Field({ column, value, onChange, error, wide }: FieldProps & { e
           {column.label}
           {column.required ? <span className="text-muted-foreground">*</span> : null}
         </Label>
-        {percent ? <span className="text-sm tabular-nums">{typeof value === "number" ? value : 0}%</span> : null}
       </div>
       <FieldInput column={column} value={value} onChange={onChange} invalid={Boolean(error)} />
       {error ? <p className="text-xs text-destructive">{error}</p> : column.config.description && column.type !== "checkbox" ? <p className="text-xs text-muted-foreground">{column.config.description}</p> : null}
@@ -248,5 +312,5 @@ export function Field({ column, value, onChange, error, wide }: FieldProps & { e
 }
 
 export function wideType(column: ColumnDef) {
-  return ["longText", "image", "percent", "multiSelect"].includes(column.type);
+  return ["longText", "image", "percent", "multiSelect", "relation"].includes(column.type);
 }

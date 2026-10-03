@@ -1,8 +1,9 @@
 import React from "react";
 import { useAbrum } from "@abrum/react";
-import { CalendarDays, Check, ImageIcon, Star } from "lucide-react";
+import { CalendarDays, Check, FileText, ImageIcon, Star, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatDate, formatNumber, optionFor, type ColumnDef, type ColumnOption, type OptionColor } from "@/lib/columns";
+import { computedFormat, computedText, formatDate, formatNumber, isComputed, isComputedError, isEmpty, optionFor, type ColumnDef, type ColumnOption, type OptionColor } from "@/lib/columns";
+import { useTableContext } from "@/lib/table-context";
 
 const COLOR_HEX: Record<OptionColor, string> = {
   gray: "#8b8f97",
@@ -147,11 +148,52 @@ export function Stars({ value, max = 5, onChange }: { value: number; max?: numbe
 
 const MAX_TAGS = 2;
 
-/** Read-only rendering of one stored value in a table cell. */
-export function CellView({ column, value }: { column: ColumnDef; value: unknown }) {
-  if (value === null || value === undefined || value === "" || (Array.isArray(value) && value.length === 0)) {
-    return <span className="text-muted-foreground/50">—</span>;
+export function RelationChips({ column, value, max = 3 }: { column: ColumnDef; value: unknown; max?: number }) {
+  const { titles } = useTableContext();
+  const ids = Array.isArray(value) ? value.map(String) : [];
+  if (ids.length === 0) return <span className="text-muted-foreground/50">—</span>;
+  return (
+    <span className="flex min-w-0 items-center gap-1.5">
+      {ids.slice(0, max).map((id) => (
+        <span key={id} className="inline-flex h-6 max-w-44 shrink-0 items-center gap-1 rounded-md bg-muted px-2 text-xs">
+          <FileText className="size-3 shrink-0 text-muted-foreground" />
+          <span className="truncate">{titles(column.config.tableKey, id) ?? "Missing row"}</span>
+        </span>
+      ))}
+      {ids.length > max ? <span className="text-xs text-muted-foreground">+{ids.length - max}</span> : null}
+    </span>
+  );
+}
+
+function ComputedView({ column, value }: { column: ColumnDef; value: unknown }) {
+  if (isComputedError(value)) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-destructive" title={value.error}>
+        <TriangleAlert className="size-3.5" /> Error
+      </span>
+    );
   }
+  if (isEmpty(value)) return <span className="text-muted-foreground/50">—</span>;
+  const format = computedFormat(column, value);
+  if (format === "checkbox") return value === true ? <Check className="size-4" /> : <span className="text-muted-foreground/50">—</span>;
+  if (format === "percent" && typeof value === "number") {
+    return (
+      <span className="flex items-center gap-3">
+        <Meter value={value} className="w-24" />
+        <span className="w-10 text-right tabular-nums">{computedText(column, value)}</span>
+      </span>
+    );
+  }
+  if (format === "date") return <span className="whitespace-nowrap">{computedText(column, value)}</span>;
+  if (typeof value === "number") return <span className="block text-right tabular-nums">{computedText(column, value)}</span>;
+  return <span className="truncate">{computedText(column, value)}</span>;
+}
+
+/** Read-only rendering of one cell value. */
+export function CellView({ column, value }: { column: ColumnDef; value: unknown }) {
+  if (isComputed(column)) return <ComputedView column={column} value={value} />;
+  if (column.type === "relation") return <RelationChips column={column} value={value} />;
+  if (isEmpty(value)) return <span className="text-muted-foreground/50">—</span>;
   switch (column.type) {
     case "number":
     case "currency":
@@ -202,6 +244,12 @@ export function CellView({ column, value }: { column: ColumnDef; value: unknown 
     case "email":
       return (
         <a href={`mailto:${value}`} className="truncate underline-offset-2 hover:underline" onClick={(event) => event.stopPropagation()}>
+          {String(value)}
+        </a>
+      );
+    case "phone":
+      return (
+        <a href={`tel:${String(value).replace(/\s/g, "")}`} className="truncate underline-offset-2 hover:underline" onClick={(event) => event.stopPropagation()}>
           {String(value)}
         </a>
       );

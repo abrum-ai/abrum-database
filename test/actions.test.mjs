@@ -16,8 +16,12 @@ function indexedFields(entity) {
   return new Set(Object.entries(schema.properties).filter(([, value]) => value["x-abrum-indexed"]).map(([key]) => key));
 }
 
+function contentTypeOf(entity) {
+  return manifest.schemas.find((item) => item.entity === entity).contentType;
+}
+
 function createStation() {
-  const store = { table: [], column: [], row: [] };
+  const store = { table: [], column: [], view: [], row: [] };
   let seq = 0;
   let clock = 1_700_000_000_000;
   const invoke = async (name, input) => {
@@ -56,7 +60,8 @@ function createStation() {
           assert.ok(!Object.values(value).some((item) => typeof item === "number" && !Number.isInteger(item)), "twins reject floats");
           pending.push(() => {
             seq += 1;
-            store[entity].push({ ...structuredClone(value), $: { cid: `c${seq}`, lineageCid: `l${seq}` } });
+            // Like the Station: `type` is the content discriminator.
+            store[entity].push({ ...structuredClone(value), type: contentTypeOf(entity), $: { cid: `c${seq}`, lineageCid: `l${seq}` } });
           });
           return value;
         },
@@ -65,7 +70,7 @@ function createStation() {
             const index = store[entity].findIndex((item) => item.$.lineageCid === record.$.lineageCid);
             assert.ok(index >= 0, "update of a missing record");
             seq += 1;
-            store[entity][index] = { ...store[entity][index], ...structuredClone(patch), $: { cid: `c${seq}`, lineageCid: record.$.lineageCid } };
+            store[entity][index] = { ...store[entity][index], ...structuredClone(patch), type: contentTypeOf(entity), $: { cid: `c${seq}`, lineageCid: record.$.lineageCid } };
           });
           return { ...record, ...patch };
         },
@@ -180,4 +185,76 @@ test("listing, paging beyond 500 rows and deleting a table", async () => {
   assert.equal(deleted.rows, 750);
   assert.equal(store.row.length, 0);
   assert.deepEqual(store.table.map((table) => table.key), ["log2"]);
+});
+
+test("relations, rollups, formulas, views and page content", async () => {
+  const { store, invoke } = createStation();
+  await invoke("createTable", { name: "Clients", columns: [{ label: "Name", type: "text", required: true }, { label: "Tier", type: "select", config: { options: ["Gold", "Silver"] } }] });
+  await invoke("createTable", {
+    name: "Projects",
+    itemName: "Project",
+    columns: [
+      { label: "Title", type: "text", required: true },
+      { label: "Client", type: "relation", config: { tableKey: "clients", single: true } },
+      { label: "Budget", type: "currency", config: { currency: "EUR" } },
+      { label: "Spent", type: "currency", config: { currency: "EUR" } },
+      { label: "Remaining", type: "formula", config: { expression: 'prop("Budget") - prop("Spent")', format: "currency" } },
+      { label: "Stage", type: "select", config: { options: ["Plan", "Build", "Done"] } },
+      { label: "Created", type: "createdTime" },
+    ],
+  });
+  assert.equal(store.view.filter((view) => view.tableKey === "projects").length, 1, "default view");
+  const clients = await invoke("addRows", { table: "clients", rows: [{ Name: "Acme", Tier: "Gold" }, { Name: "Globex", Tier: "Silver" }] });
+  const projects = await invoke("addRows", {
+    table: "projects",
+    rows: [
+      { values: { Title: "Website", Client: "acme", Budget: 1000, Spent: 1250.5, Stage: "Build" }, body: "# Scope\n- Landing page" },
+      { Title: "App", Client: clients.ids[1], Budget: 5000, Spent: 100, Stage: "Plan" },
+    ],
+  });
+  await assert.rejects(invoke("addRows", { table: "projects", rows: [{ Title: "X", Remaining: 3 }] }), /computed/);
+  await assert.rejects(invoke("addRows", { table: "projects", rows: [{ Title: "X", Client: "Initech" }] }), /no row “Initech”/);
+
+  await invoke("addColumn", { table: "clients", label: "Projects", type: "relation", config: { tableKey: "projects" } });
+  await invoke("updateRows", { table: "clients", updates: [{ id: clients.ids[0], values: { Projects: [projects.ids[0], projects.ids[1]] } }] });
+  await invoke("addColumn", { table: "clients", label: "Total budget", type: "rollup", config: { relation: "Projects", property: "Budget", fn: "sum" } });
+  await invoke("addColumn", { table: "clients", label: "Project count", type: "rollup", config: { relation: "projects" } });
+  await assert.rejects(invoke("addColumn", { table: "clients", label: "Bad", type: "formula", config: { expression: "1 +" } }), /expression/);
+  await assert.rejects(invoke("removeColumn", { table: "clients", column: "Projects" }), /rollups/);
+
+  const acme = await invoke("getRow", { table: "clients", id: clients.ids[0] });
+  assert.equal(acme.title, "Acme");
+  assert.equal(acme.values.totalBudget, 6000);
+  assert.equal(acme.values.projectCount, 2);
+  assert.deepEqual(acme.values.projects.map((item) => item.title), ["Website", "App"]);
+
+  const website = await invoke("getRow", { table: "projects", id: projects.ids[0] });
+  assert.equal(website.values.remaining, -250.5);
+  assert.deepEqual(website.values.client, [{ id: clients.ids[0], title: "Acme" }]);
+  assert.equal(website.body, "# Scope\n- Landing page");
+  assert.match(website.values.created, /^\d{4}-\d{2}-\d{2}$/);
+
+  const over = await invoke("queryRows", { table: "projects", filters: [{ column: "Remaining", op: "lt", value: 0 }] });
+  assert.deepEqual(over.rows.map((row) => row.values.title), ["Website"]);
+  const byClient = await invoke("queryRows", { table: "projects", filters: [{ column: "Client", op: "contains", value: "globex" }] });
+  assert.deepEqual(byClient.rows.map((row) => row.values.title), ["App"]);
+  const bodySearch = await invoke("queryRows", { table: "projects", search: "landing" });
+  assert.equal(bodySearch.total, 1);
+
+  const board = await invoke("createView", { table: "projects", name: "Pipeline", layout: "board", config: { filters: [{ column: "Stage", op: "neq", value: "Done" }], sorts: [{ column: "Budget", direction: "desc" }] } });
+  assert.equal(board.view.config.groupBy, "stage");
+  const viewRows = await invoke("queryRows", { table: "projects", view: "Pipeline" });
+  assert.deepEqual(viewRows.rows.map((row) => row.values.title), ["App", "Website"]);
+  await invoke("updateView", { table: "projects", view: "pipeline", config: { columns: [{ key: "Title" }, { key: "budget", width: 160 }, { key: "spent", hidden: true }], sorts: null } });
+  const updated = store.view.find((view) => view.key === "pipeline");
+  assert.deepEqual(updated.config.columns, [{ key: "title" }, { key: "budget", width: 160 }, { key: "spent", hidden: true }]);
+  assert.equal(updated.config.sorts, undefined);
+  await assert.rejects(invoke("createView", { table: "projects", name: "Bad", layout: "board", config: { groupBy: "Budget" } }), /groupBy/);
+  await invoke("deleteView", { table: "projects", view: "Pipeline" });
+  await assert.rejects(invoke("deleteView", { table: "projects", view: "All" }), /at least one view/);
+
+  await invoke("updateRows", { table: "projects", updates: [{ id: projects.ids[1], body: "Kickoff notes" }] });
+  assert.equal((await invoke("getRow", { table: "projects", id: projects.ids[1] })).body, "Kickoff notes");
+  const described = await invoke("describeTable", { table: "Projects" });
+  assert.deepEqual(described.views.map((view) => view.key), ["all"]);
 });

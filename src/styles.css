@@ -100,3 +100,15 @@
   border-radius: 1px;
   background: #4cb86a;
 }
+
+/* The app fills its surface: the table scrolls, not the page. */
+.abrum-shell {
+  height: 100dvh;
+  min-height: 0;
+}
+.abrum-shell-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}

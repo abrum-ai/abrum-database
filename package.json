@@ -12,11 +12,13 @@
   },
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5188",
-    "prebuild": "abrum-app generate",
+    "prebuild": "node scripts/build-backend.mjs && abrum-app generate",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
-    "test": "node --test test/*.test.mjs",
-    "sync:abrum": "node scripts/sync-to-abrum.mjs"
+    "test": "node scripts/build-backend.mjs && node --test test/*.test.mjs",
+    "sync:abrum": "node scripts/sync-to-abrum.mjs",
+    "build:backend": "node scripts/build-backend.mjs",
+    "test:live": "node --test qa/live.test.mjs"
   },
   "dependencies": {
     "@abrum/react": "file:vendor/abrum-sdk/abrum-react-0.1.1.tgz",
@@ -25,6 +27,7 @@
     "@abrum/web-runtime": "file:vendor/abrum-sdk/abrum-web-runtime-0.1.1.tgz",
     "@tailwindcss/vite": "^4.1.17",
     "@tanstack/react-table": "^8.21.3",
+    "@tanstack/react-virtual": "^3.14.13",
     "@vitejs/plugin-react": "^5.1.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

@@ -1,6 +1,6 @@
 import React from "react";
 import { AbrumAppShell, AbrumAppReady, processAffordance, useAbrumCanWrite } from "@abrum/react";
-import { Loader2, MoreHorizontal, Pencil, Plus, Table2, Trash2 } from "lucide-react";
+import { Database as DatabaseIcon, Loader2, MoreHorizontal, Pencil, Plus, Table2, Tag, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -8,23 +8,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import type { ColumnDef } from "@/lib/columns";
-import { useRows, useTables } from "@/lib/data";
+import { useDatabase, type Database } from "@/lib/data";
 import { TEMPLATES, type Template } from "@/lib/templates";
-import { ColumnDialog, type ColumnDraft } from "@/components/column-dialog";
-import { DataTable } from "@/components/data-table";
-import { ItemSheet, NewItemDialog } from "@/components/item-forms";
+import { TableWorkspace } from "@/components/workspace";
 
 export function App() {
-  const data = useTables();
+  const db = useDatabase();
   const canWrite = useAbrumCanWrite();
   const [activeKey, setActiveKey] = React.useState<string | null>(null);
   const [newTableOpen, setNewTableOpen] = React.useState(false);
-  const active = data.tables.find((table) => table.key === activeKey) ?? data.tables[0] ?? null;
+  const active = db.tables.find((table) => table.key === activeKey) ?? db.tables[0] ?? null;
 
   async function createFromTemplate(template: Template, name: string) {
-    const created = await data.createTable({ name, itemName: template.itemName, columns: template.columns });
-    setActiveKey(created.key);
+    const key = await db.createTable({ name, itemName: template.itemName, columns: template.columns });
+    setActiveKey(key);
   }
 
   return (
@@ -32,48 +29,48 @@ export function App() {
       <AbrumAppShell appName="Table">
         <AbrumAppReady />
         <div
-          className="flex h-full min-h-[480px] flex-col"
+          className="flex h-full min-h-0 flex-col"
           {...processAffordance("tables", {
-            phase: data.error ? "error" : data.isLoading ? "loading" : "ready",
-            busy: data.isLoading,
-            availableActions: ["table.create", "row.create", "row.open", "column.add"],
-            blockers: data.error ? [data.error] : [],
+            phase: db.error ? "error" : db.isLoading ? "loading" : "ready",
+            busy: db.isLoading,
+            availableActions: ["table.create", "row.create", "row.open", "column.add", "view.create"],
+            blockers: db.error ? [db.error] : [],
           })}
         >
-          {data.tables.length > 0 ? (
-            <nav className="flex items-center gap-1 overflow-x-auto border-b px-4 sm:px-6" aria-label="Tables">
-              {data.tables.map((table) => (
+          {db.tables.length > 0 ? (
+            <nav className="flex items-center gap-1 overflow-x-auto border-b px-4 sm:px-6" aria-label="Databases">
+              {db.tables.map((table) => (
                 <button
                   key={table.key}
                   type="button"
                   onClick={() => setActiveKey(table.key)}
                   className={cn(
-                    "relative -mb-px shrink-0 border-b-2 px-2 py-3 text-sm transition-colors",
+                    "relative -mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-2 py-3 text-sm transition-colors",
                     table.key === active?.key ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
                   )}
                 >
-                  {table.name}
+                  <DatabaseIcon className="size-3.5" /> {table.name}
                 </button>
               ))}
               {canWrite ? (
-                <Button size="icon" variant="ghost" className="ml-1 size-7 shrink-0" aria-label="New table" onClick={() => setNewTableOpen(true)}>
+                <Button size="icon" variant="ghost" className="ml-1 size-7 shrink-0" aria-label="New database" onClick={() => setNewTableOpen(true)}>
                   <Plus />
                 </Button>
               ) : null}
-              {active && canWrite ? <TableMenu key={active.key} tableKey={active.key} name={active.name} data={data} /> : null}
+              {active && canWrite ? <TableMenu key={active.key} db={db} tableKey={active.key} name={active.name} itemName={active.itemName} /> : null}
             </nav>
           ) : null}
 
-          {data.isLoading && data.tables.length === 0 ? (
+          {db.isLoading && db.tables.length === 0 ? (
             <div className="grid flex-1 place-items-center text-muted-foreground">
               <Loader2 className="size-5 animate-spin" />
             </div>
           ) : active ? (
-            <TableView key={active.key} tableKey={active.key} tableName={active.name} itemName={active.itemName || "Item"} data={data} canWrite={canWrite} />
+            <TableWorkspace key={active.key} db={db} tableKey={active.key} canWrite={canWrite} />
           ) : (
             <EmptyState canWrite={canWrite} onCreate={createFromTemplate} />
           )}
-          {data.error ? <p className="px-6 py-2 text-sm text-destructive">{data.error}</p> : null}
+          {db.error ? <p className="px-6 py-2 text-sm text-destructive">{db.error}</p> : null}
         </div>
         <NewTableDialog open={newTableOpen} onOpenChange={setNewTableOpen} onCreate={createFromTemplate} />
       </AbrumAppShell>
@@ -81,97 +78,48 @@ export function App() {
   );
 }
 
-function TableView({
-  tableKey,
-  tableName,
-  itemName,
-  data,
-  canWrite,
-}: {
-  tableKey: string;
-  tableName: string;
-  itemName: string;
-  data: ReturnType<typeof useTables>;
-  canWrite: boolean;
-}) {
-  const rows = useRows(tableKey);
-  const columns: ColumnDef[] = data.columnsFor(tableKey).map((column) => column.def);
-  const [openRowId, setOpenRowId] = React.useState<string | null>(null);
-  const [newItemOpen, setNewItemOpen] = React.useState(false);
-  const [columnDialog, setColumnDialog] = React.useState<{ open: boolean; column: ColumnDef | null }>({ open: false, column: null });
-  const openRow = rows.rows.find((row) => row.id === openRowId) ?? null;
-  const sections = [...new Set(columns.map((column) => column.config.section).filter((section): section is string => Boolean(section)))];
-
-  async function saveColumn(draft: ColumnDraft) {
-    if (columnDialog.column) await data.updateColumn(tableKey, columnDialog.column.key, draft);
-    else await data.addColumn(tableKey, draft);
-  }
-
-  return (
-    <>
-      <DataTable
-        tableName={tableName}
-        itemName={itemName}
-        columns={columns}
-        rows={rows.rows}
-        canWrite={canWrite}
-        onOpenRow={setOpenRowId}
-        onNewItem={() => setNewItemOpen(true)}
-        onAddColumn={() => setColumnDialog({ open: true, column: null })}
-        onEditColumn={(column) => setColumnDialog({ open: true, column })}
-        onHideColumn={(column, hidden) => void data.updateColumn(tableKey, column.key, { hidden })}
-        onDeleteColumn={(column) => {
-          if (window.confirm(`Delete the column “${column.label}”? Values stay in the rows but are no longer shown.`)) void data.removeColumn(tableKey, column.key);
-        }}
-        onDeleteRows={(ids) => rows.deleteRows(ids)}
-      />
-      {rows.error ? <p className="px-6 py-2 text-sm text-destructive">{rows.error}</p> : null}
-      <NewItemDialog open={newItemOpen} onOpenChange={setNewItemOpen} columns={columns} itemName={itemName} tableName={tableName} onCreate={rows.createRow} />
-      <ItemSheet
-        row={openRow}
-        columns={columns}
-        itemName={itemName}
-        onOpenChange={(open) => !open && setOpenRowId(null)}
-        onSave={rows.updateRow}
-        onDelete={(id) => rows.deleteRows([id])}
-      />
-      <ColumnDialog
-        open={columnDialog.open}
-        column={columnDialog.column}
-        sections={sections}
-        onOpenChange={(open) => setColumnDialog((current) => ({ ...current, open }))}
-        onSubmit={saveColumn}
-      />
-    </>
-  );
-}
-
-function TableMenu({ tableKey, name, data }: { tableKey: string; name: string; data: ReturnType<typeof useTables> }) {
-  const rows = useRows(tableKey);
+function TableMenu({ db, tableKey, name, itemName }: { db: Database; tableKey: string; name: string; itemName: string }) {
+  const [busy, setBusy] = React.useState(false);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button size="icon" variant="ghost" className="ml-auto size-7 shrink-0" aria-label={`${name} options`}>
-          <MoreHorizontal />
+          {busy ? <Loader2 className="animate-spin" /> : <MoreHorizontal />}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem
           onSelect={() => {
-            const next = window.prompt("Rename table", name)?.trim();
-            if (next && next !== name) void data.renameTable(tableKey, next);
+            const next = window.prompt("Rename database", name)?.trim();
+            if (next && next !== name) void db.updateTable(tableKey, { name: next });
           }}
         >
           <Pencil /> Rename
         </DropdownMenuItem>
+        <DropdownMenuItem
+          onSelect={() => {
+            const next = window.prompt("Name of one item (e.g. Company, Task)", itemName)?.trim();
+            if (next && next !== itemName) void db.updateTable(tableKey, { itemName: next });
+          }}
+        >
+          <Tag /> Item name
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           variant="destructive"
-          onSelect={() => {
-            if (window.confirm(`Delete “${name}” with all ${rows.rows.length} rows?`)) void data.deleteTable(tableKey, rows.rows);
+          onSelect={async () => {
+            if (!window.confirm(`Delete “${name}” with all its rows, properties and views? This cannot be undone.`)) return;
+            setBusy(true);
+            try {
+              await db.deleteTable(tableKey);
+            } catch (cause) {
+              window.alert(cause instanceof Error ? cause.message : String(cause));
+            } finally {
+              setBusy(false);
+            }
           }}
         >
-          <Trash2 /> Delete table
+          <Trash2 /> Delete database
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -187,11 +135,11 @@ function TemplatePicker({ onPick, busy }: { onPick: (template: Template) => void
           type="button"
           disabled={Boolean(busy)}
           onClick={() => onPick(template)}
-          className="grid gap-1.5 rounded-lg border p-4 text-left transition-colors hover:bg-accent disabled:opacity-60"
+          className="grid content-start gap-1.5 rounded-lg border p-4 text-left transition-colors hover:bg-accent disabled:opacity-60"
         >
           <span className="flex items-center gap-2 font-medium">
             {busy === template.id ? <Loader2 className="size-4 animate-spin" /> : <Table2 className="size-4 text-muted-foreground" />}
-            {template.id === "blank" ? "Blank table" : template.name}
+            {template.id === "blank" ? "Blank database" : template.name}
           </span>
           <span className="text-sm text-muted-foreground">{template.description}</span>
         </button>
@@ -204,11 +152,11 @@ function EmptyState({ canWrite, onCreate }: { canWrite: boolean; onCreate: (temp
   const [busy, setBusy] = React.useState<string | null>(null);
   const [failure, setFailure] = React.useState<string | null>(null);
   return (
-    <div className="mx-auto grid w-full max-w-3xl content-center gap-6 px-6 py-16">
+    <div className="mx-auto grid w-full max-w-3xl content-center gap-6 overflow-y-auto px-6 py-16">
       <div className="grid gap-2">
-        <h1 className="text-xl font-semibold">Create your first table</h1>
+        <h1 className="text-xl font-semibold">Create your first database</h1>
         <p className="text-muted-foreground">
-          Every table, column and row is stored as a signed twin in this Room. Start from a template or ask your agent to build one, e.g. “Create a table of suppliers with logo, rating and contract value”.
+          Databases, properties, views and rows are stored as signed twins in this Room. Start from a template or ask your agent, e.g. “Create a supplier database with logo, rating and contract value”.
         </p>
       </div>
       {canWrite ? (
@@ -227,7 +175,7 @@ function EmptyState({ canWrite, onCreate }: { canWrite: boolean; onCreate: (temp
           }}
         />
       ) : (
-        <p className="text-sm text-muted-foreground">You can read this Room but not create tables.</p>
+        <p className="text-sm text-muted-foreground">You can read this Room but not create databases.</p>
       )}
       {failure ? <p className="text-sm text-destructive">{failure}</p> : null}
     </div>
@@ -235,17 +183,18 @@ function EmptyState({ canWrite, onCreate }: { canWrite: boolean; onCreate: (temp
 }
 
 function NewTableDialog({ open, onOpenChange, onCreate }: { open: boolean; onOpenChange: (open: boolean) => void; onCreate: (template: Template, name: string) => Promise<void> }) {
-  const [template, setTemplate] = React.useState<Template>(TEMPLATES[TEMPLATES.length - 1]);
+  const blank = TEMPLATES[TEMPLATES.length - 1];
+  const [template, setTemplate] = React.useState<Template>(blank);
   const [name, setName] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [failure, setFailure] = React.useState<string | null>(null);
   React.useEffect(() => {
     if (open) {
-      setTemplate(TEMPLATES[TEMPLATES.length - 1]);
+      setTemplate(blank);
       setName("");
       setFailure(null);
     }
-  }, [open]);
+  }, [open, blank]);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
@@ -266,8 +215,8 @@ function NewTableDialog({ open, onOpenChange, onCreate }: { open: boolean; onOpe
           }}
         >
           <DialogHeader>
-            <DialogTitle>New table</DialogTitle>
-            <DialogDescription>Pick a starting point. You and your agents can add and change columns any time.</DialogDescription>
+            <DialogTitle>New database</DialogTitle>
+            <DialogDescription>Pick a starting point. You and your agents can add and change properties any time.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-3 sm:grid-cols-3">
             {TEMPLATES.map((item) => (
@@ -278,7 +227,7 @@ function NewTableDialog({ open, onOpenChange, onCreate }: { open: boolean; onOpe
                 className={cn("grid gap-1 rounded-lg border p-3 text-left text-sm transition-colors hover:bg-accent", item.id === template.id && "border-foreground/40 bg-accent")}
               >
                 <span className="font-medium">{item.id === "blank" ? "Blank" : item.name}</span>
-                <span className="text-muted-foreground">{item.columns.length} columns</span>
+                <span className="text-muted-foreground">{item.columns.length} properties</span>
               </button>
             ))}
           </div>
@@ -292,7 +241,7 @@ function NewTableDialog({ open, onOpenChange, onCreate }: { open: boolean; onOpe
               Cancel
             </Button>
             <Button type="submit" disabled={busy}>
-              {busy ? <Loader2 className="animate-spin" /> : <Plus />} Create table
+              {busy ? <Loader2 className="animate-spin" /> : <Plus />} Create database
             </Button>
           </DialogFooter>
         </form>
