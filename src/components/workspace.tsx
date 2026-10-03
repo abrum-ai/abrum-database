@@ -4,6 +4,7 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  ChevronDown,
   Columns3,
   Copy,
   Eye,
@@ -82,7 +83,7 @@ function RelatedSource({ tableKey, onRows }: { tableKey: string; onRows: (tableK
   return null;
 }
 
-export function TableWorkspace({ db, tableKey, canWrite }: { db: Database; tableKey: string; canWrite: boolean }) {
+export function TableWorkspace({ db, tableKey, canWrite, tabs }: { db: Database; tableKey: string; canWrite: boolean; tabs: React.ReactNode }) {
   const table = db.tables.find((item) => item.key === tableKey)!;
   const itemName = table.itemName;
   const columns = db.columnsFor(tableKey);
@@ -279,102 +280,102 @@ export function TableWorkspace({ db, tableKey, canWrite }: { db: Database; table
         <RelatedSource key={key} tableKey={key} onRows={onRelatedRows} />
       ))}
       <div className="flex min-h-0 flex-1 flex-col">
-        <ViewTabs
-          action={
-            canWrite ? (
-              <Button size="sm" onClick={() => setNewItem({ open: true, defaults: {} })} disabled={columns.length === 0}>
-                <Plus /> New {itemName}
-              </Button>
-            ) : null
-          }
-          views={views}
-          active={view.key}
-          canWrite={canWrite}
-          onSelect={setViewKey}
-          onCreate={async (layout) => {
-            const groupBy = columns.find((column) => column.type === "select" || column.type === "person")?.key;
-            const key = await guard(() =>
-              db.createView(tableKey, { name: LAYOUT_LABELS[layout], layout, config: layout === "board" && groupBy ? { groupBy } : {} }),
-            );
-            setViewKey(key);
-          }}
-          onRename={(target, name) => void guard(() => db.updateView(tableKey, target.key, target.persisted ? { name } : { name, layout: target.layout, config: target.config }))}
-          onDuplicate={async (target) => setViewKey(await guard(() => db.createView(tableKey, { name: `${target.name} copy`, layout: target.layout, config: target.key === view.key ? view.config : target.config })))}
-          onDelete={(target) => {
-            if (views.length > 1 && window.confirm(`Delete the view “${target.name}”?`)) {
-              void guard(() => db.deleteView(tableKey, target.key));
-              setViewKey(views.find((item) => item.key !== target.key)!.key);
-            }
-          }}
-          onLayout={(target, layout) => {
-            const groupBy = target.config.groupBy ?? columns.find((column) => column.type === "select" || column.type === "person")?.key;
-            void guard(() =>
-              db.updateView(tableKey, target.key, {
-                ...(target.persisted ? {} : { name: target.name }),
-                layout,
-                config: layout === "board" && groupBy ? { ...target.config, groupBy } : target.config,
-              }),
-            );
-          }}
-        />
-
-        <div className="flex flex-wrap items-center gap-2 px-4 py-3 sm:px-6">
-          <div className="relative w-full sm:w-60">
-            <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={`Search ${table.name.toLowerCase()}…`} className="pl-8" aria-label="Search rows" />
+        <div className="flex h-12 shrink-0 items-stretch gap-1 border-b px-4 sm:px-6">
+          <div className="flex min-w-0 items-stretch gap-1 overflow-x-auto">{tabs}</div>
+          <div className="flex shrink-0 items-center gap-1">
+            <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
+              <ViewSwitcher
+                views={views}
+                active={view.key}
+                canWrite={canWrite}
+                onSelect={setViewKey}
+                onCreate={async (layout) => {
+                  const groupBy = columns.find((column) => column.type === "select" || column.type === "person")?.key;
+                  const key = await guard(() =>
+                    db.createView(tableKey, { name: LAYOUT_LABELS[layout], layout, config: layout === "board" && groupBy ? { groupBy } : {} }),
+                  );
+                  setViewKey(key);
+                }}
+                onRename={(target, name) => void guard(() => db.updateView(tableKey, target.key, target.persisted ? { name } : { name, layout: target.layout, config: target.config }))}
+                onDuplicate={async (target) => setViewKey(await guard(() => db.createView(tableKey, { name: `${target.name} copy`, layout: target.layout, config: target.key === view.key ? view.config : target.config })))}
+                onDelete={(target) => {
+                  if (views.length > 1 && window.confirm(`Delete the view “${target.name}”?`)) {
+                    void guard(() => db.deleteView(tableKey, target.key));
+                    setViewKey(views.find((item) => item.key !== target.key)!.key);
+                  }
+                }}
+                onLayout={(target, layout) => {
+                  const groupBy = target.config.groupBy ?? columns.find((column) => column.type === "select" || column.type === "person")?.key;
+                  void guard(() =>
+                    db.updateView(tableKey, target.key, {
+                      ...(target.persisted ? {} : { name: target.name }),
+                      layout,
+                      config: layout === "board" && groupBy ? { ...target.config, groupBy } : target.config,
+                    }),
+                  );
+                }}
+              />
           </div>
-          <FilterMenu columns={all} config={view.config} onChange={changeView} />
-          <SortMenu columns={all} sorts={sorts} onChange={(next) => changeView({ ...view.config, sorts: next })} />
-          <PropertiesMenu view={view} columns={columns} canWrite={canWrite} onChange={changeView} onAdd={() => setColumnDialog({ open: true, column: null })} />
-          {data.isLoadingMore ? (
-            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Loader2 className="size-3.5 animate-spin" /> Loading {data.rows.length.toLocaleString()}…
-            </span>
-          ) : null}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" className="ml-auto size-8" aria-label="More view options">
-                <MoreHorizontal />
+          <div className="ml-auto flex shrink-0 items-center gap-0.5 pl-2">
+            {data.isLoadingMore ? (
+              <span className="flex items-center gap-1.5 px-1 text-xs text-muted-foreground" title={`Loading ${data.rows.length.toLocaleString()}…`}>
+                <Loader2 className="size-3.5 animate-spin" />
+              </span>
+            ) : null}
+            <InlineSearch value={search} onChange={setSearch} placeholder={`Search ${table.name.toLowerCase()}…`} />
+            <FilterMenu columns={all} config={view.config} onChange={changeView} />
+            <SortMenu columns={all} sorts={sorts} onChange={(next) => changeView({ ...view.config, sorts: next })} />
+            <PropertiesMenu view={view} columns={columns} canWrite={canWrite} onChange={changeView} onAdd={() => setColumnDialog({ open: true, column: null })} />
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="size-8 text-muted-foreground" aria-label="More view options" title="Group, cover, export and import">
+                      <MoreHorizontal />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    {view.layout === "board" ? (
+                      <OptionSubmenu
+                        label="Group by"
+                        value={view.config.groupBy ?? columns.find((column) => column.type === "select" || column.type === "person")?.key}
+                        options={columns.filter((column) => ["select", "person", "checkbox"].includes(column.type))}
+                        onChange={(groupBy) => changeView({ ...view.config, groupBy })}
+                      />
+                    ) : null}
+                    {view.layout === "board" || view.layout === "gallery" ? (
+                      <OptionSubmenu
+                        label="Cover"
+                        value={view.config.cover ?? (view.layout === "gallery" ? imageColumn(columns)?.key : undefined)}
+                        options={columns.filter((column) => column.type === "image")}
+                        allowNone
+                        onChange={(cover) => changeView({ ...view.config, cover })}
+                      />
+                    ) : null}
+                    {view.layout === "board" || view.layout === "gallery" ? <DropdownMenuSeparator /> : null}
+                    <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                      Export {selectedIds.length ? `${selectedIds.length} selected` : `${visibleRows.length} in view`}
+                    </DropdownMenuLabel>
+                    <DropdownMenuItem onSelect={() => download(`${fileBase}.csv`, toCsv(shown, exportRows.map((row) => row.values), computed.titles), "text/csv;charset=utf-8")}>
+                      <FileDown /> Export CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => download(`${fileBase}.json`, JSON.stringify(toJsonRows(columns, exportRows, computed.titles), null, 2), "application/json")}>
+                      <FileDown /> Export JSON
+                    </DropdownMenuItem>
+                    {canWrite ? (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onSelect={() => setImportOpen(true)}>
+                          <FileUp /> Import CSV…
+                        </DropdownMenuItem>
+                      </>
+                    ) : null}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+            {canWrite ? (
+              <Button size="sm" className="ml-1 h-8" onClick={() => setNewItem({ open: true, defaults: {} })} disabled={columns.length === 0}>
+                <Plus /> <span className="hidden sm:inline">New {itemName}</span>
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              {view.layout === "board" ? (
-                <OptionSubmenu
-                  label="Group by"
-                  value={view.config.groupBy ?? columns.find((column) => column.type === "select" || column.type === "person")?.key}
-                  options={columns.filter((column) => ["select", "person", "checkbox"].includes(column.type))}
-                  onChange={(groupBy) => changeView({ ...view.config, groupBy })}
-                />
-              ) : null}
-              {view.layout === "board" || view.layout === "gallery" ? (
-                <OptionSubmenu
-                  label="Cover"
-                  value={view.config.cover ?? (view.layout === "gallery" ? imageColumn(columns)?.key : undefined)}
-                  options={columns.filter((column) => column.type === "image")}
-                  allowNone
-                  onChange={(cover) => changeView({ ...view.config, cover })}
-                />
-              ) : null}
-              {view.layout === "board" || view.layout === "gallery" ? <DropdownMenuSeparator /> : null}
-              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-                Export {selectedIds.length ? `${selectedIds.length} selected` : `${visibleRows.length} in view`}
-              </DropdownMenuLabel>
-              <DropdownMenuItem onSelect={() => download(`${fileBase}.csv`, toCsv(shown, exportRows.map((row) => row.values), computed.titles), "text/csv;charset=utf-8")}>
-                <FileDown /> Export CSV
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => download(`${fileBase}.json`, JSON.stringify(toJsonRows(columns, exportRows, computed.titles), null, 2), "application/json")}>
-                <FileDown /> Export JSON
-              </DropdownMenuItem>
-              {canWrite ? (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onSelect={() => setImportOpen(true)}>
-                    <FileUp /> Import CSV…
-                  </DropdownMenuItem>
-                </>
-              ) : null}
-            </DropdownMenuContent>
-          </DropdownMenu>
+            ) : null}
+          </div>
         </div>
 
         {selectedIds.length > 0 ? (
@@ -454,8 +455,7 @@ export function TableWorkspace({ db, tableKey, canWrite }: { db: Database; table
   );
 }
 
-function ViewTabs({
-  action,
+function ViewSwitcher({
   views,
   active,
   canWrite,
@@ -466,7 +466,6 @@ function ViewTabs({
   onDelete,
   onLayout,
 }: {
-  action: React.ReactNode;
   views: ViewDef[];
   active: string;
   canWrite: boolean;
@@ -478,87 +477,138 @@ function ViewTabs({
   onLayout: (view: ViewDef, layout: Layout) => void;
 }) {
   const current = views.find((view) => view.key === active) ?? views[0];
+  const CurrentIcon = LAYOUT_ICONS[current.layout];
   return (
-    <div className="flex items-center gap-1 overflow-x-auto px-4 pt-2 sm:px-6" role="tablist" aria-label="Views">
-      {views.map((view) => {
-        const Icon = LAYOUT_ICONS[view.layout];
-        return (
-          <button
-            key={view.key}
-            type="button"
-            role="tab"
-            aria-selected={view.key === active}
-            onClick={() => onSelect(view.key)}
-            className={cn(
-              "flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm",
-              view.key === active ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
-            )}
-          >
-            <Icon className="size-3.5" /> {view.name}
-          </button>
-        );
-      })}
-      {canWrite ? (
-        <>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="icon" variant="ghost" className="size-7 shrink-0" aria-label="Add view">
-                <Plus />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuLabel>New view</DropdownMenuLabel>
-              {LAYOUTS.map((layout) => {
-                const Icon = LAYOUT_ICONS[layout];
-                return (
-                  <DropdownMenuItem key={layout} onSelect={() => onCreate(layout)}>
-                    <Icon /> {LAYOUT_LABELS[layout]}
-                  </DropdownMenuItem>
-                );
-              })}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="icon" variant="ghost" className="size-7 shrink-0" aria-label={`${current.name} view options`}>
-                <MoreHorizontal />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuLabel>Layout</DropdownMenuLabel>
-              {LAYOUTS.map((layout) => {
-                const Icon = LAYOUT_ICONS[layout];
-                return (
-                  <DropdownMenuItem key={layout} onSelect={() => onLayout(current, layout)} className={cn(layout === current.layout && "bg-accent")}>
-                    <Icon /> {LAYOUT_LABELS[layout]}
-                  </DropdownMenuItem>
-                );
-              })}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onSelect={() => {
-                  const name = window.prompt("Rename view", current.name)?.trim();
-                  if (name && name !== current.name) onRename(current, name);
-                }}
-              >
-                <Pencil /> Rename
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-8 gap-1.5 px-2 font-medium" aria-label={`View: ${current.name}`}>
+          <CurrentIcon className="size-4 text-muted-foreground" />
+          <span className="max-w-44 truncate">{current.name}</span>
+          <ChevronDown className="size-3.5 text-muted-foreground" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-60">
+        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Views</DropdownMenuLabel>
+        <DropdownMenuRadioGroup value={current.key} onValueChange={onSelect}>
+          {views.map((view) => {
+            const Icon = LAYOUT_ICONS[view.layout];
+            return (
+              <DropdownMenuRadioItem key={view.key} value={view.key}>
+                <Icon className="size-4 text-muted-foreground" /> <span className="truncate">{view.name}</span>
+              </DropdownMenuRadioItem>
+            );
+          })}
+        </DropdownMenuRadioGroup>
+        {canWrite ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <Plus /> New view
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                {LAYOUTS.map((layout) => {
+                  const Icon = LAYOUT_ICONS[layout];
+                  return (
+                    <DropdownMenuItem key={layout} onSelect={() => onCreate(layout)}>
+                      <Icon /> {LAYOUT_LABELS[layout]}
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <CurrentIcon /> Layout
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                <DropdownMenuRadioGroup value={current.layout} onValueChange={(layout) => onLayout(current, layout as Layout)}>
+                  {LAYOUTS.map((layout) => (
+                    <DropdownMenuRadioItem key={layout} value={layout}>
+                      {LAYOUT_LABELS[layout]}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            <DropdownMenuItem
+              onSelect={() => {
+                const name = window.prompt("Rename view", current.name)?.trim();
+                if (name && name !== current.name) onRename(current, name);
+              }}
+            >
+              <Pencil /> Rename view
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => onDuplicate(current)}>
+              <Copy /> Duplicate view
+            </DropdownMenuItem>
+            {views.length > 1 ? (
+              <DropdownMenuItem variant="destructive" onSelect={() => onDelete(current)}>
+                <Trash2 /> Delete view
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => onDuplicate(current)}>
-                <Copy /> Duplicate
-              </DropdownMenuItem>
-              {views.length > 1 ? (
-                <DropdownMenuItem variant="destructive" onSelect={() => onDelete(current)}>
-                  <Trash2 /> Delete view
-                </DropdownMenuItem>
-              ) : null}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </>
+            ) : null}
+          </>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/** Search collapses to an icon; it stays open while it holds a query. */
+function InlineSearch({ value, onChange, placeholder }: { value: string; onChange: (value: string) => void; placeholder: string }) {
+  const [open, setOpen] = React.useState(false);
+  if (!open && !value) {
+    return (
+      <Button variant="ghost" size="icon" className="size-8 text-muted-foreground" aria-label="Search" title="Search" onClick={() => setOpen(true)}>
+        <Search />
+      </Button>
+    );
+  }
+  return (
+    <div className="relative w-40 sm:w-56">
+      <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+      <Input
+        autoFocus
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        onBlur={() => !value && setOpen(false)}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            onChange("");
+            setOpen(false);
+          }
+        }}
+        placeholder={placeholder}
+        className="h-8 pr-7 pl-8"
+        aria-label="Search rows"
+      />
+      {value ? (
+        <button type="button" className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground" aria-label="Clear search" onClick={() => onChange("")}>
+          <X className="size-3.5" />
+        </button>
       ) : null}
-      {action ? <div className="ml-auto shrink-0 py-1 pl-2">{action}</div> : null}
     </div>
   );
 }
+
+/** Icon trigger for toolbar popovers; shows a count while something is active. */
+const ToolButton = React.forwardRef<HTMLButtonElement, React.ComponentProps<typeof Button> & { label: string; count?: number }>(
+  ({ label, count, children, className, ...props }, ref) => (
+    <Button
+      ref={ref}
+      variant="ghost"
+      size="sm"
+      className={cn("h-8 gap-1 px-2 text-muted-foreground", count ? "bg-accent text-foreground" : "", className)}
+      aria-label={count ? `${label} (${count})` : label}
+      title={label}
+      {...props}
+    >
+      {children}
+      {count ? <span className="text-xs tabular-nums">{count}</span> : null}
+    </Button>
+  ),
+);
+ToolButton.displayName = "ToolButton";
 
 function FilterMenu({ columns, config, onChange }: { columns: ColumnDef[]; config: ViewConfig; onChange: (config: ViewConfig) => void }) {
   const filterable = columns.filter((column) => column.type !== "image" && column.type !== "trend");
@@ -568,11 +618,11 @@ function FilterMenu({ columns, config, onChange }: { columns: ColumnDef[]; confi
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className={cn(filters.length && "border-foreground/30")}>
-          <Filter /> Filter{filters.length ? ` · ${filters.length}` : ""}
-        </Button>
+        <ToolButton label="Filter" count={filters.length}>
+          <Filter />
+        </ToolButton>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-[min(38rem,calc(100vw-2rem))] p-3">
+      <PopoverContent align="end" className="w-[min(38rem,calc(100vw-2rem))] p-3">
         <div className="grid gap-2">
           {filters.length === 0 ? <p className="text-sm text-muted-foreground">No filters. Filters are saved with this view for everyone.</p> : null}
           {filters.map((filter, index) => {
@@ -696,11 +746,11 @@ function SortMenu({ columns, sorts, onChange }: { columns: ColumnDef[]; sorts: V
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className={cn(active.length && "border-foreground/30")}>
-          <ArrowUpDown /> Sort{active.length ? ` · ${active.length}` : ""}
-        </Button>
+        <ToolButton label="Sort" count={active.length}>
+          <ArrowUpDown />
+        </ToolButton>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-[min(26rem,calc(100vw-2rem))] p-3">
+      <PopoverContent align="end" className="w-[min(26rem,calc(100vw-2rem))] p-3">
         <div className="grid gap-2">
           {active.length === 0 ? <p className="text-sm text-muted-foreground">Rows are in creation order.</p> : null}
           {active.map((sort, index) => (
@@ -768,11 +818,11 @@ function PropertiesMenu({ view, columns, canWrite, onChange, onAdd }: { view: Vi
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Columns3 /> Properties{hiddenCount ? ` · ${hiddenCount} hidden` : ""}
-        </Button>
+        <ToolButton label={hiddenCount ? `Properties, ${hiddenCount} hidden` : "Properties"} count={hiddenCount}>
+          <Columns3 />
+        </ToolButton>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-80 p-2">
+      <PopoverContent align="end" className="w-80 p-2">
         <div className="max-h-80 overflow-y-auto">
           {list.map((column, index) => (
             <div key={column.key} className="flex items-center gap-1 rounded-md px-1 py-0.5 hover:bg-accent/60">

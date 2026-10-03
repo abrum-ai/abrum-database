@@ -37,36 +37,42 @@ export function App() {
             blockers: db.error ? [db.error] : [],
           })}
         >
-          {db.tables.length > 0 ? (
-            <nav className="flex items-center gap-1 overflow-x-auto border-b px-4 sm:px-6" aria-label="Databases">
-              {db.tables.map((table) => (
-                <button
-                  key={table.key}
-                  type="button"
-                  onClick={() => setActiveKey(table.key)}
-                  className={cn(
-                    "relative -mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-2 py-3 text-sm transition-colors",
-                    table.key === active?.key ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  <DatabaseIcon className="size-3.5" /> {table.name}
-                </button>
-              ))}
-              {canWrite ? (
-                <Button size="icon" variant="ghost" className="ml-1 size-7 shrink-0" aria-label="New database" onClick={() => setNewTableOpen(true)}>
-                  <Plus />
-                </Button>
-              ) : null}
-              {active && canWrite ? <TableMenu key={active.key} db={db} tableKey={active.key} name={active.name} itemName={active.itemName} /> : null}
-            </nav>
-          ) : null}
-
           {db.isLoading && db.tables.length === 0 ? (
             <div className="grid flex-1 place-items-center text-muted-foreground">
               <Loader2 className="size-5 animate-spin" />
             </div>
           ) : active ? (
-            <TableWorkspace key={active.key} db={db} tableKey={active.key} canWrite={canWrite} />
+            <TableWorkspace
+              key={active.key}
+              db={db}
+              tableKey={active.key}
+              canWrite={canWrite}
+              tabs={
+                <nav className="flex items-stretch gap-1" aria-label="Databases">
+                  {db.tables.map((table) => (
+                    <button
+                      key={table.key}
+                      type="button"
+                      onClick={() => setActiveKey(table.key)}
+                      className={cn(
+                        "relative -mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-2 text-sm transition-colors",
+                        table.key === active.key ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      <DatabaseIcon className="size-3.5" /> {table.name}
+                    </button>
+                  ))}
+                  {canWrite ? (
+                    <div className="flex shrink-0 items-center gap-0.5">
+                      <Button size="icon" variant="ghost" className="size-7" aria-label="New database" title="New database" onClick={() => setNewTableOpen(true)}>
+                        <Plus />
+                      </Button>
+                      <TableMenu key={active.key} db={db} tableKey={active.key} name={active.name} itemName={active.itemName} />
+                    </div>
+                  ) : null}
+                </nav>
+              }
+            />
           ) : (
             <EmptyState canWrite={canWrite} onCreate={createFromTemplate} />
           )}
@@ -83,7 +89,7 @@ function TableMenu({ db, tableKey, name, itemName }: { db: Database; tableKey: s
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button size="icon" variant="ghost" className="ml-auto size-7 shrink-0" aria-label={`${name} options`}>
+        <Button size="icon" variant="ghost" className="size-7 shrink-0" aria-label={`${name} options`} title="Database options">
           {busy ? <Loader2 className="animate-spin" /> : <MoreHorizontal />}
         </Button>
       </DropdownMenuTrigger>
