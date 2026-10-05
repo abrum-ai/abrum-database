@@ -1,6 +1,6 @@
 export declare const abrumModule: {
-  readonly appId: "abrum.table";
-  readonly package: "@abrum/table-web";
+  readonly appId: "abrum.database";
+  readonly package: "@abrum/database-web";
   readonly version: "^0.1.0";
   readonly __abrumModule: true;
   readonly required: true;

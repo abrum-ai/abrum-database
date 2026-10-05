@@ -328,7 +328,7 @@ function EditableCell({
   const display = (
     <span className={cn("flex min-w-0 items-center gap-2", primary && "font-medium")}>
       {thumb ? (
-        <ImageThumb value={row.values[thumb.key]} size={28} className="shrink-0 rounded-md text-[28px]" fallback={<Monogram text={textValue(column, value, titles)} />} />
+        <ImageThumb value={row.values[thumb.key]} size={28} className="shrink-0 rounded-md text-display" fallback={<Monogram text={textValue(column, value, titles)} />} />
       ) : null}
       <span className="min-w-0 flex-1 truncate">{primary && !value ? <span className="text-muted-foreground/60">Untitled</span> : <CellView column={column} value={value} />}</span>
     </span>

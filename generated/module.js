@@ -1,13 +1,74 @@
 export const abrumModule = {
   "__abrumModule": true,
-  "appId": "abrum.table",
-  "package": "@abrum/table-web",
+  "appId": "abrum.database",
+  "package": "@abrum/database-web",
   "version": "^0.1.0",
   "required": true,
   "schemas": [
     {
+      "entity": "config",
+      "name": "abrum.database.config.v1",
+      "contentType": "abrum_database_config",
+      "schema": {
+        "type": "object",
+        "required": [
+          "type",
+          "title",
+          "createdAtMs",
+          "updatedAtMs"
+        ],
+        "properties": {
+          "type": {
+            "const": "abrum_database_config"
+          },
+          "title": {
+            "type": "string",
+            "x-abrum-indexed": false,
+            "x-abrum-unique": false
+          },
+          "createdAtMs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string",
+                "format": "date-time"
+              }
+            ],
+            "x-abrum-indexed": true,
+            "x-abrum-unique": false
+          },
+          "updatedAtMs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string",
+                "format": "date-time"
+              }
+            ],
+            "x-abrum-indexed": false,
+            "x-abrum-unique": false
+          }
+        },
+        "additionalProperties": true,
+        "x-abrum": {
+          "app": "abrum.database",
+          "entity": "config",
+          "schemaName": "abrum.database.config.v1",
+          "scope": "room",
+          "indexed": [
+            "createdAtMs"
+          ],
+          "unique": []
+        }
+      }
+    },
+    {
       "entity": "table",
-      "name": "abrum.table.table.v1",
+      "name": "abrum.database.table.v1",
       "contentType": "abrum_table",
       "schema": {
         "type": "object",
@@ -77,9 +138,9 @@ export const abrumModule = {
         },
         "additionalProperties": true,
         "x-abrum": {
-          "app": "abrum.table",
+          "app": "abrum.database",
           "entity": "table",
-          "schemaName": "abrum.table.table.v1",
+          "schemaName": "abrum.database.table.v1",
           "scope": "room",
           "indexed": [
             "key",
@@ -93,7 +154,7 @@ export const abrumModule = {
     },
     {
       "entity": "column",
-      "name": "abrum.table.column.v1",
+      "name": "abrum.database.column.v1",
       "contentType": "abrum_table_column",
       "schema": {
         "type": "object",
@@ -174,9 +235,9 @@ export const abrumModule = {
         },
         "additionalProperties": true,
         "x-abrum": {
-          "app": "abrum.table",
+          "app": "abrum.database",
           "entity": "column",
-          "schemaName": "abrum.table.column.v1",
+          "schemaName": "abrum.database.column.v1",
           "scope": "room",
           "indexed": [
             "tableKey",
@@ -189,7 +250,7 @@ export const abrumModule = {
     },
     {
       "entity": "view",
-      "name": "abrum.table.view.v1",
+      "name": "abrum.database.view.v1",
       "contentType": "abrum_table_view",
       "schema": {
         "type": "object",
@@ -265,9 +326,9 @@ export const abrumModule = {
         },
         "additionalProperties": true,
         "x-abrum": {
-          "app": "abrum.table",
+          "app": "abrum.database",
           "entity": "view",
-          "schemaName": "abrum.table.view.v1",
+          "schemaName": "abrum.database.view.v1",
           "scope": "room",
           "indexed": [
             "tableKey",
@@ -280,7 +341,7 @@ export const abrumModule = {
     },
     {
       "entity": "row",
-      "name": "abrum.table.row.v1",
+      "name": "abrum.database.row.v1",
       "contentType": "abrum_table_row",
       "schema": {
         "type": "object",
@@ -344,9 +405,9 @@ export const abrumModule = {
         },
         "additionalProperties": true,
         "x-abrum": {
-          "app": "abrum.table",
+          "app": "abrum.database",
           "entity": "row",
-          "schemaName": "abrum.table.row.v1",
+          "schemaName": "abrum.database.row.v1",
           "scope": "room",
           "indexed": [
             "tableKey",
@@ -359,6 +420,22 @@ export const abrumModule = {
     }
   ],
   "functions": [
+    {
+      "id": "renameDatabase",
+      "description": "Rename this Database app in its exact Room without changing the Space or any table, column, view or row.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
+      }
+    },
     {
       "id": "listTables",
       "description": "List all tables in this Room with keys, row counts, columns and views.",
@@ -503,6 +580,9 @@ export const abrumModule = {
           },
           "confirm": {
             "type": "boolean"
+          },
+          "expectedLineageCid": {
+            "type": "string"
           }
         },
         "required": [
@@ -730,30 +810,11 @@ export const abrumModule = {
   ],
   "capabilityOffers": [
     {
-      "id": "abrum.table.read",
-      "title": "Read tables",
-      "description": "Use Table's read actions in an Agent context.",
-      "functions": [
-        "listTables",
-        "describeTable",
-        "queryRows",
-        "getRow"
-      ],
-      "modes": [
-        "on_behalf_of_caller"
-      ],
-      "defaultMode": "on_behalf_of_caller",
-      "risk": "low",
-      "resultPolicies": [
-        "agent_room"
-      ],
-      "defaultResultPolicy": "agent_room"
-    },
-    {
-      "id": "abrum.table.manage",
+      "id": "abrum.database.manage",
       "title": "Manage tables, columns, views and rows",
-      "description": "Use Table's manage actions in an Agent context.",
+      "description": "Use Database's manage actions in an Agent context.",
       "functions": [
+        "renameDatabase",
         "createTable",
         "updateTable",
         "deleteTable",
@@ -776,12 +837,32 @@ export const abrumModule = {
         "agent_room"
       ],
       "defaultResultPolicy": "agent_room"
+    },
+    {
+      "id": "abrum.database.read",
+      "title": "Read tables",
+      "description": "Use Database's read actions in an Agent context.",
+      "functions": [
+        "listTables",
+        "describeTable",
+        "queryRows",
+        "getRow"
+      ],
+      "modes": [
+        "on_behalf_of_caller"
+      ],
+      "defaultMode": "on_behalf_of_caller",
+      "risk": "low",
+      "resultPolicies": [
+        "agent_room"
+      ],
+      "defaultResultPolicy": "agent_room"
     }
   ],
   "surfaces": [
     {
       "kind": "web",
-      "label": "Table",
+      "label": "Database",
       "entrypoint": "/"
     }
   ]

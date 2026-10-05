@@ -1,4 +1,4 @@
-// Agent tools for abrum.table. Every table, column, view and row is a signed
+// Agent tools for abrum.database. Every table, column, view and row is a signed
 // twin; these functions read them through ctx.db and write new heads. Writes
 // are applied after the function returns, so each function reads first, then
 // emits all of its writes.
@@ -510,6 +510,19 @@ function viewConfig(config, columns) {
 
 // ---- functions -------------------------------------------------------------
 
+module.exports.renameDatabase = async function renameDatabase(ctx, input) {
+  const title = text(input.title, "title");
+  if (title.length > 80) fail("title must be at most 80 characters");
+  const records = await ctx.db.config.findMany({ limit: 2 });
+  if (records.length > 1) fail("Database name has conflicting heads; repair it before renaming");
+  const current = records[0];
+  if (current?.title === title) return { data: { status: "unchanged", title } };
+  const now = ctx.nowMs();
+  if (current) ctx.db.config.update(current, { title, updatedAtMs: now });
+  else ctx.db.config.create({ title, createdAtMs: now, updatedAtMs: now });
+  return { data: { status: "saved", title } };
+};
+
 module.exports.listTables = async function listTables(ctx) {
   const tables = await loadTables(ctx);
   if (!tables.length) return { data: { tables: [] } };
@@ -673,6 +686,9 @@ module.exports.updateTable = async function updateTable(ctx, input) {
 module.exports.deleteTable = async function deleteTable(ctx, input) {
   if (input.confirm !== true) fail("deleteTable requires confirm: true");
   const table = await resolveTable(ctx, input.table);
+  if (input.expectedLineageCid && (table.$?.lineageCid ?? table.$?.cid) !== input.expectedLineageCid) {
+    fail("Table was replaced; select the current table before deleting");
+  }
   const [columns, views, rows] = await Promise.all([loadColumns(ctx, table.key), loadViews(ctx, table.key), loadRows(ctx, table.key)]);
   for (const row of rows) ctx.db.row.delete(row);
   for (const column of columns) ctx.db.column.delete(column.record);

@@ -15,7 +15,7 @@ function inline(text: string, keyPrefix: string): React.ReactNode[] {
     if (match.index > last) nodes.push(text.slice(last, match.index));
     const token = match[0];
     const key = `${keyPrefix}-${index++}`;
-    if (token.startsWith("`")) nodes.push(<code key={key} className="rounded bg-muted px-1 py-0.5 text-[0.9em]">{token.slice(1, -1)}</code>);
+    if (token.startsWith("`")) nodes.push(<code key={key} className="rounded bg-muted px-1 py-0.5 text-code">{token.slice(1, -1)}</code>);
     else if (token.startsWith("**") || token.startsWith("__")) nodes.push(<strong key={key}>{inline(token.slice(2, -2), key)}</strong>);
     else if (token.startsWith("~~")) nodes.push(<s key={key}>{inline(token.slice(2, -2), key)}</s>);
     else if (token.startsWith("[")) {

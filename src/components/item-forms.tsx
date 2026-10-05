@@ -108,7 +108,7 @@ export function NewItemDialog({
           <div className="min-h-0 flex-1 overflow-y-auto">
             {sections(editable).map((group, index) => (
               <section key={group.title ?? `section-${index}`} className="grid gap-5 border-b px-6 py-6 last:border-b-0">
-                {group.title ? <h3 className="text-xs font-medium tracking-[0.12em] text-muted-foreground uppercase">{group.title}</h3> : null}
+                {group.title ? <h3 className="text-xs font-medium tracking-label text-muted-foreground uppercase">{group.title}</h3> : null}
                 <div className="grid gap-5 sm:grid-cols-2">
                   {group.columns.map((column) => (
                     <Field
@@ -217,7 +217,7 @@ export function RowSheet({
                   <ImageThumb
                     value={form.values[image.key]}
                     size={64}
-                    className="rounded-xl text-[64px]"
+                    className="rounded-xl text-display"
                     fallback={<Monogram text={title ? textValue(title, form.values[title.key], titles) : ""} />}
                   />
                 ) : null}
@@ -257,7 +257,7 @@ export function RowSheet({
                 ))}
               </div>
               <section className="grid gap-2 px-6 py-6">
-                <h3 className="text-xs font-medium tracking-[0.12em] text-muted-foreground uppercase">Page</h3>
+                <h3 className="text-xs font-medium tracking-label text-muted-foreground uppercase">Page</h3>
                 <PageBody value={body} onChange={setBody} readOnly={!canWrite} />
               </section>
             </div>

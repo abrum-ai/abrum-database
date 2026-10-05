@@ -6,6 +6,6 @@ import "./styles.css";
 mountAbrumApp({
   app: <App />,
   deferReadyUntilAppCommit: true,
-  appId: "abrum.table",
-  install: { ...install, package: "@abrum/table-web" },
+  appId: "abrum.database",
+  install: { ...install, package: "@abrum/database-web" },
 });

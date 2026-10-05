@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Mirror this repository into the ABRUM monorepo as the bundled app
-// `apps/table-web`. This repository stays the source of truth; the monorepo
+// `apps/database-web`. This repository stays the source of truth; the monorepo
 // copy only swaps the vendored SDK tarballs for the workspace packages and the
 // codegen entry point for the monorepo's scripts/gen-app.mjs.
 //
@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 
 const source = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const monorepo = path.resolve(process.argv[2] ?? process.env.ABRUM_REPO ?? path.join(source, "..", "abrum"));
-const target = path.join(monorepo, "apps", "table-web");
+const target = path.join(monorepo, "apps", "database-web");
 
 if (!existsSync(path.join(monorepo, "configs", "default-apps.json"))) {
   console.error(`${monorepo} is not an ABRUM monorepo checkout`);
@@ -45,16 +45,16 @@ await writeFile(path.join(target, "package.json"), `${JSON.stringify(pkg, null, 
 
 await writeFile(
   path.join(target, "SOURCE.md"),
-  "# Source\n\nThis app is mirrored from https://github.com/abrum-ai/abrum-table by `scripts/sync-to-abrum.mjs`.\nMake changes there and sync; edits made here are overwritten.\n",
+  "# Source\n\nThis app is mirrored from https://github.com/abrum-ai/abrum-database by `scripts/sync-to-abrum.mjs`.\nMake changes there and sync; edits made here are overwritten.\n",
 );
 
 const registryPath = path.join(monorepo, "configs", "default-apps.json");
 const registry = JSON.parse(await readFile(registryPath, "utf8"));
-if (!registry.apps.some((entry) => entry.dir === "table-web")) {
+if (!registry.apps.some((entry) => entry.dir === "database-web")) {
   const calendar = registry.apps.findIndex((entry) => entry.dir === "abrum-calendar");
   registry.apps.splice(calendar >= 0 ? calendar + 1 : registry.apps.length, 0, {
-    $comment: "Dynamic databases: tables, columns, views and rows are Room twins; agents extend the schema through abrum.table tools. Source: abrum-ai/abrum-table.",
-    dir: "table-web",
+    $comment: "Dynamic databases: tables, columns, views and rows are Room twins; agents extend the schema through abrum.database tools. Source: abrum-ai/abrum-database.",
+    dir: "database-web",
     default: false,
   });
   await writeFile(registryPath, `${JSON.stringify(registry, null, 2)}\n`);

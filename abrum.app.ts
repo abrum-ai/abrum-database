@@ -21,12 +21,25 @@ const VIEW_HELP =
   "cover: image column for gallery/board cards; cardColumns: column keys shown on cards; wrap: true wraps cell text.";
 
 export default defineApp({
-  id: "abrum.table",
-  title: "Table",
+  id: "abrum.database",
+  title: "Database",
   icon: "database",
   description: "Databases stored as signed twins: tables with typed columns, relations, rollups and formulas, shared views (table, board, gallery, list) and a page per row. People and agents can extend the schema at any time.",
+  sidebar: {
+    contextLabel: {
+      fallback: "appTitle",
+      source: { contentType: "abrum_database_config", field: "title", orderBy: "updatedAtMs" },
+    },
+    createRoom: { label: "Add Database", defaultAgentOfferId: "abrum.database.manage" },
+    roomActions: [{ id: "table.create", label: "Add table", icon: "plus", primary: true, navigationOnly: true }],
+  },
   entities: {
-    // One database (a tab). `key` is the stable, agent-facing id.
+    config: abrum.entity({
+      title: abrum.string(),
+      createdAtMs: abrum.createdAt(),
+      updatedAtMs: abrum.updatedAt(),
+    }).type("abrum_database_config").roomScoped(),
+    // One table. `key` is the stable, agent-facing id.
     table: abrum.collection({
       key: abrum.string().unique(),
       name: abrum.string(),
@@ -74,6 +87,12 @@ export default defineApp({
     }).type("abrum_table_row"),
   },
   actions: {
+    renameDatabase: abrum.action({
+      description: "Rename this Database app in its exact Room without changing the Space or any table, column, view or row.",
+      input: { title: abrum.string() },
+      offer: "manage",
+      risk: "low",
+    }),
     listTables: abrum.action({
       description: "List all tables in this Room with keys, row counts, columns and views.",
       input: {},
@@ -140,7 +159,7 @@ export default defineApp({
     }),
     deleteTable: abrum.action({
       description: `Delete a table with all its columns, views and rows. Requires confirm: true. table: ${TABLE_REF}`,
-      input: { table: abrum.string(), confirm: abrum.boolean() },
+      input: { table: abrum.string(), confirm: abrum.boolean(), expectedLineageCid: abrum.string().optional() },
       offer: "manage",
       risk: "medium",
     }),

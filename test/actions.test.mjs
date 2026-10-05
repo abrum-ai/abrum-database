@@ -21,7 +21,7 @@ function contentTypeOf(entity) {
 }
 
 function createStation() {
-  const store = { table: [], column: [], view: [], row: [] };
+  const store = { config: [], table: [], column: [], view: [], row: [] };
   let seq = 0;
   let clock = 1_700_000_000_000;
   const invoke = async (name, input) => {
@@ -92,6 +92,39 @@ function createStation() {
 
 test("every declared action has an implementation", () => {
   for (const fn of manifest.functions) assert.equal(typeof actions[fn.id], "function", fn.id);
+});
+
+test("Database name persists in one lineage without modifying its tables", async () => {
+  const { store, invoke } = createStation();
+  await invoke("createTable", { name: "Companies" });
+  const before = structuredClone(store.table);
+  assert.deepEqual(await invoke("renameDatabase", { title: " Sales CRM " }), { status: "saved", title: "Sales CRM" });
+  const first = structuredClone(store.config[0]);
+  await invoke("renameDatabase", { title: "Customers" });
+  assert.equal(store.config.length, 1);
+  assert.equal(store.config[0].$.lineageCid, first.$.lineageCid);
+  assert.equal(store.config[0].createdAtMs, first.createdAtMs);
+  assert.equal(store.config[0].title, "Customers");
+  assert.deepEqual(store.table, before);
+  assert.equal((await invoke("renameDatabase", { title: "Customers" })).status, "unchanged");
+  await assert.rejects(invoke("renameDatabase", { title: " " }), /title is required/);
+  await assert.rejects(invoke("renameDatabase", { title: "X".repeat(81) }), /80 characters/);
+  store.config.push({ ...first, $: { cid: "conflict", lineageCid: "other" } });
+  await assert.rejects(invoke("renameDatabase", { title: "Rejected" }), /conflicting heads/);
+});
+
+test("a stale table menu cannot delete a replacement with the same key", async () => {
+  const { store, invoke } = createStation();
+  await invoke("createTable", { name: "Companies", key: "companies" });
+  const original = store.table[0].$.lineageCid;
+  await invoke("deleteTable", { table: "companies", confirm: true, expectedLineageCid: original });
+  await invoke("createTable", { name: "Companies", key: "companies" });
+  const replacement = store.table[0].$.lineageCid;
+  assert.notEqual(replacement, original);
+  await assert.rejects(invoke("deleteTable", { table: "companies", confirm: true, expectedLineageCid: original }), /replaced/);
+  assert.equal(store.table[0].$.lineageCid, replacement);
+  await invoke("deleteTable", { table: "companies", confirm: true, expectedLineageCid: replacement });
+  assert.equal(store.table.length, 0);
 });
 
 test("agent builds a table, extends the schema and edits rows", async () => {

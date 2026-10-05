@@ -283,7 +283,7 @@ export function TableWorkspace({ db, tableKey, canWrite, tabs }: { db: Database;
         <div className="flex h-12 shrink-0 items-stretch gap-1 border-b px-4 sm:px-6">
           <div className="flex min-w-0 items-stretch gap-1 overflow-x-auto">{tabs}</div>
           <div className="flex shrink-0 items-center gap-1">
-            <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
+            {tabs ? <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" /> : null}
               <ViewSwitcher
                 views={views}
                 active={view.key}
@@ -304,16 +304,6 @@ export function TableWorkspace({ db, tableKey, canWrite, tabs }: { db: Database;
                     setViewKey(views.find((item) => item.key !== target.key)!.key);
                   }
                 }}
-                onLayout={(target, layout) => {
-                  const groupBy = target.config.groupBy ?? columns.find((column) => column.type === "select" || column.type === "person")?.key;
-                  void guard(() =>
-                    db.updateView(tableKey, target.key, {
-                      ...(target.persisted ? {} : { name: target.name }),
-                      layout,
-                      config: layout === "board" && groupBy ? { ...target.config, groupBy } : target.config,
-                    }),
-                  );
-                }}
               />
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-0.5 pl-2">
@@ -323,6 +313,15 @@ export function TableWorkspace({ db, tableKey, canWrite, tabs }: { db: Database;
               </span>
             ) : null}
             <InlineSearch value={search} onChange={setSearch} placeholder={`Search ${table.name.toLowerCase()}…`} />
+            <LayoutMenu layout={view.layout} canWrite={canWrite} onChange={(layout) => {
+              window.clearTimeout(saveTimer.current);
+              const groupBy = view.config.groupBy ?? columns.find((column) => column.type === "select" || column.type === "person")?.key;
+              void guard(() => db.updateView(tableKey, view.key, {
+                ...(view.persisted ? {} : { name: view.name }),
+                layout,
+                config: layout === "board" && groupBy ? { ...view.config, groupBy } : view.config,
+              }));
+            }} />
             <FilterMenu columns={all} config={view.config} onChange={changeView} />
             <SortMenu columns={all} sorts={sorts} onChange={(next) => changeView({ ...view.config, sorts: next })} />
             <PropertiesMenu view={view} columns={columns} canWrite={canWrite} onChange={changeView} onAdd={() => setColumnDialog({ open: true, column: null })} />
@@ -464,7 +463,6 @@ function ViewSwitcher({
   onRename,
   onDuplicate,
   onDelete,
-  onLayout,
 }: {
   views: ViewDef[];
   active: string;
@@ -474,7 +472,6 @@ function ViewSwitcher({
   onRename: (view: ViewDef, name: string) => void;
   onDuplicate: (view: ViewDef) => void;
   onDelete: (view: ViewDef) => void;
-  onLayout: (view: ViewDef, layout: Layout) => void;
 }) {
   const current = views.find((view) => view.key === active) ?? views[0];
   const CurrentIcon = LAYOUT_ICONS[current.layout];
@@ -517,20 +514,6 @@ function ViewSwitcher({
                 })}
               </DropdownMenuSubContent>
             </DropdownMenuSub>
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                <CurrentIcon /> Layout
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent>
-                <DropdownMenuRadioGroup value={current.layout} onValueChange={(layout) => onLayout(current, layout as Layout)}>
-                  {LAYOUTS.map((layout) => (
-                    <DropdownMenuRadioItem key={layout} value={layout}>
-                      {LAYOUT_LABELS[layout]}
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
             <DropdownMenuItem
               onSelect={() => {
                 const name = window.prompt("Rename view", current.name)?.trim();
@@ -549,6 +532,26 @@ function ViewSwitcher({
             ) : null}
           </>
         ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function LayoutMenu({ layout, canWrite, onChange }: { layout: Layout; canWrite: boolean; onChange: (layout: Layout) => void }) {
+  const CurrentIcon = LAYOUT_ICONS[layout];
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <ToolButton label="Layout" disabled={!canWrite}><CurrentIcon /></ToolButton>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuLabel>Layout</DropdownMenuLabel>
+        <DropdownMenuRadioGroup value={layout} onValueChange={(next) => onChange(next as Layout)}>
+          {LAYOUTS.map((option) => {
+            const Icon = LAYOUT_ICONS[option];
+            return <DropdownMenuRadioItem key={option} value={option}><Icon /> {LAYOUT_LABELS[option]}</DropdownMenuRadioItem>;
+          })}
+        </DropdownMenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );

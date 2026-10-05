@@ -109,7 +109,10 @@ export function useDatabase() {
 
   async function deleteTable(tableKey: string) {
     // The agent tool deletes rows, columns, views and the table in one signed batch.
-    await actions.deleteTable({ table: tableKey, confirm: true });
+    const table = tableList.find(item => item.key === tableKey);
+    if (!table) throw new Error("This table is no longer available.");
+    const record = table.record as { $: { lineageCid?: string; cid: string } };
+    await actions.deleteTable({ table: tableKey, confirm: true, expectedLineageCid: record.$.lineageCid ?? record.$.cid });
   }
 
   async function addColumn(tableKey: string, input: { label: string; type: ColumnType; config: ColumnConfig; required: boolean }) {

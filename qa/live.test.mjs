@@ -1,4 +1,4 @@
-// Live integration tests against a real ABRUM Station with abrum.table
+// Live integration tests against a real ABRUM Station with abrum.database
 // installed. Every call goes through the signed /api/apps/run path and the
 // Station's station-js runtime, exactly like an agent tool call.
 //
@@ -25,7 +25,7 @@ const client = enabled
 
 const suffix = Date.now().toString(36);
 async function call(fn, input = {}) {
-  const result = await client.post("/api/apps/run", { room_id: room, app_id: "abrum.table", function: fn, input });
+  const result = await client.post("/api/apps/run", { room_id: room, app_id: "abrum.database", function: fn, input });
   const { stationTiming, effectResources, ...data } = result.data ?? {};
   return data;
 }

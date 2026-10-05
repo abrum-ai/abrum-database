@@ -1,11 +1,16 @@
 import { abrum, type AbrumAppFunctionDef, type AbrumEntityRecord, type AbrumInstallAppOptions } from "@abrum/web-runtime";
 
-export const TABLE_APP_ID = "abrum.table";
-export const TABLE_APP_VERSION = "0.1.0";
-export const TABLE_SCHEMA_NAME = "abrum.table.table.v1";
-export const COLUMN_SCHEMA_NAME = "abrum.table.column.v1";
-export const VIEW_SCHEMA_NAME = "abrum.table.view.v1";
-export const ROW_SCHEMA_NAME = "abrum.table.row.v1";
+export const DATABASE_APP_ID = "abrum.database";
+export const DATABASE_APP_VERSION = "0.1.0";
+export const CONFIG_SCHEMA_NAME = "abrum.database.config.v1";
+export const TABLE_SCHEMA_NAME = "abrum.database.table.v1";
+export const COLUMN_SCHEMA_NAME = "abrum.database.column.v1";
+export const VIEW_SCHEMA_NAME = "abrum.database.view.v1";
+export const ROW_SCHEMA_NAME = "abrum.database.row.v1";
+
+export interface RenameDatabaseInput {
+  title: string;
+}
 
 export interface ListTablesInput {
 
@@ -50,6 +55,7 @@ export interface UpdateTableInput {
 export interface DeleteTableInput {
   table: string;
   confirm: boolean;
+  expectedLineageCid?: string;
 }
 
 export interface AddColumnInput {
@@ -113,7 +119,12 @@ export interface DeleteViewInput {
   view: string;
 }
 
-export const tableApp = abrum.app("abrum.table", {
+export const databaseApp = abrum.app("abrum.database", {
+  config: abrum.entity({
+    title: abrum.string(),
+    createdAtMs: abrum.date().index(),
+    updatedAtMs: abrum.date(),
+  }).named("abrum.database.config.v1").type("abrum_database_config").roomScoped(),
   table: abrum.entity({
     key: abrum.string().unique(),
     name: abrum.string(),
@@ -122,7 +133,7 @@ export const tableApp = abrum.app("abrum.table", {
     order: abrum.number(),
     createdAtMs: abrum.date().index(),
     updatedAtMs: abrum.date(),
-  }).named("abrum.table.table.v1").type("abrum_table").roomScoped(),
+  }).named("abrum.database.table.v1").type("abrum_table").roomScoped(),
   column: abrum.entity({
     tableKey: abrum.string().index(),
     key: abrum.string().index(),
@@ -133,7 +144,7 @@ export const tableApp = abrum.app("abrum.table", {
     order: abrum.number(),
     createdAtMs: abrum.date().index(),
     updatedAtMs: abrum.date(),
-  }).named("abrum.table.column.v1").type("abrum_table_column").roomScoped(),
+  }).named("abrum.database.column.v1").type("abrum_table_column").roomScoped(),
   view: abrum.entity({
     tableKey: abrum.string().index(),
     key: abrum.string().index(),
@@ -143,7 +154,7 @@ export const tableApp = abrum.app("abrum.table", {
     order: abrum.number(),
     createdAtMs: abrum.date().index(),
     updatedAtMs: abrum.date(),
-  }).named("abrum.table.view.v1").type("abrum_table_view").roomScoped(),
+  }).named("abrum.database.view.v1").type("abrum_table_view").roomScoped(),
   row: abrum.entity({
     tableKey: abrum.string().index(),
     id: abrum.string().index(),
@@ -151,9 +162,10 @@ export const tableApp = abrum.app("abrum.table", {
     body: abrum.string().optional(),
     createdAtMs: abrum.date().index(),
     updatedAtMs: abrum.date(),
-  }).named("abrum.table.row.v1").type("abrum_table_row").roomScoped(),
+  }).named("abrum.database.row.v1").type("abrum_table_row").roomScoped(),
 }, {
   functions: {
+    renameDatabase: {"name":"renameDatabase"} as AbrumAppFunctionDef<RenameDatabaseInput>,
     listTables: {"name":"listTables"} as AbrumAppFunctionDef<ListTablesInput>,
     describeTable: {"name":"describeTable"} as AbrumAppFunctionDef<DescribeTableInput>,
     queryRows: {"name":"queryRows"} as AbrumAppFunctionDef<QueryRowsInput>,
@@ -172,16 +184,17 @@ export const tableApp = abrum.app("abrum.table", {
     deleteView: {"name":"deleteView"} as AbrumAppFunctionDef<DeleteViewInput>,
   },
 });
-export const app = tableApp;
+export const app = databaseApp;
 
-export type TableRecord = AbrumEntityRecord<(typeof tableApp.entities)["table"]>;
-export type ColumnRecord = AbrumEntityRecord<(typeof tableApp.entities)["column"]>;
-export type ViewRecord = AbrumEntityRecord<(typeof tableApp.entities)["view"]>;
-export type RowRecord = AbrumEntityRecord<(typeof tableApp.entities)["row"]>;
+export type ConfigRecord = AbrumEntityRecord<(typeof databaseApp.entities)["config"]>;
+export type TableRecord = AbrumEntityRecord<(typeof databaseApp.entities)["table"]>;
+export type ColumnRecord = AbrumEntityRecord<(typeof databaseApp.entities)["column"]>;
+export type ViewRecord = AbrumEntityRecord<(typeof databaseApp.entities)["view"]>;
+export type RowRecord = AbrumEntityRecord<(typeof databaseApp.entities)["row"]>;
 
-export const tableInstallManifest: AbrumInstallAppOptions = {
-  "appId": "abrum.table",
-  "title": "Table",
+export const databaseInstallManifest: AbrumInstallAppOptions = {
+  "appId": "abrum.database",
+  "title": "Database",
   "icon": "database",
   "description": "Databases stored as signed twins: tables with typed columns, relations, rollups and formulas, shared views (table, board, gallery, list) and a page per row. People and agents can extend the schema at any time.",
   "kind": "web",
@@ -189,8 +202,69 @@ export const tableInstallManifest: AbrumInstallAppOptions = {
   "executionLevel": "trusted-plugin",
   "schemas": [
     {
+      "entity": "config",
+      "name": "abrum.database.config.v1",
+      "contentType": "abrum_database_config",
+      "schema": {
+        "type": "object",
+        "required": [
+          "type",
+          "title",
+          "createdAtMs",
+          "updatedAtMs"
+        ],
+        "properties": {
+          "type": {
+            "const": "abrum_database_config"
+          },
+          "title": {
+            "type": "string",
+            "x-abrum-indexed": false,
+            "x-abrum-unique": false
+          },
+          "createdAtMs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string",
+                "format": "date-time"
+              }
+            ],
+            "x-abrum-indexed": true,
+            "x-abrum-unique": false
+          },
+          "updatedAtMs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string",
+                "format": "date-time"
+              }
+            ],
+            "x-abrum-indexed": false,
+            "x-abrum-unique": false
+          }
+        },
+        "additionalProperties": true,
+        "x-abrum": {
+          "app": "abrum.database",
+          "entity": "config",
+          "schemaName": "abrum.database.config.v1",
+          "scope": "room",
+          "indexed": [
+            "createdAtMs"
+          ],
+          "unique": []
+        }
+      }
+    },
+    {
       "entity": "table",
-      "name": "abrum.table.table.v1",
+      "name": "abrum.database.table.v1",
       "contentType": "abrum_table",
       "schema": {
         "type": "object",
@@ -260,9 +334,9 @@ export const tableInstallManifest: AbrumInstallAppOptions = {
         },
         "additionalProperties": true,
         "x-abrum": {
-          "app": "abrum.table",
+          "app": "abrum.database",
           "entity": "table",
-          "schemaName": "abrum.table.table.v1",
+          "schemaName": "abrum.database.table.v1",
           "scope": "room",
           "indexed": [
             "key",
@@ -276,7 +350,7 @@ export const tableInstallManifest: AbrumInstallAppOptions = {
     },
     {
       "entity": "column",
-      "name": "abrum.table.column.v1",
+      "name": "abrum.database.column.v1",
       "contentType": "abrum_table_column",
       "schema": {
         "type": "object",
@@ -357,9 +431,9 @@ export const tableInstallManifest: AbrumInstallAppOptions = {
         },
         "additionalProperties": true,
         "x-abrum": {
-          "app": "abrum.table",
+          "app": "abrum.database",
           "entity": "column",
-          "schemaName": "abrum.table.column.v1",
+          "schemaName": "abrum.database.column.v1",
           "scope": "room",
           "indexed": [
             "tableKey",
@@ -372,7 +446,7 @@ export const tableInstallManifest: AbrumInstallAppOptions = {
     },
     {
       "entity": "view",
-      "name": "abrum.table.view.v1",
+      "name": "abrum.database.view.v1",
       "contentType": "abrum_table_view",
       "schema": {
         "type": "object",
@@ -448,9 +522,9 @@ export const tableInstallManifest: AbrumInstallAppOptions = {
         },
         "additionalProperties": true,
         "x-abrum": {
-          "app": "abrum.table",
+          "app": "abrum.database",
           "entity": "view",
-          "schemaName": "abrum.table.view.v1",
+          "schemaName": "abrum.database.view.v1",
           "scope": "room",
           "indexed": [
             "tableKey",
@@ -463,7 +537,7 @@ export const tableInstallManifest: AbrumInstallAppOptions = {
     },
     {
       "entity": "row",
-      "name": "abrum.table.row.v1",
+      "name": "abrum.database.row.v1",
       "contentType": "abrum_table_row",
       "schema": {
         "type": "object",
@@ -527,9 +601,9 @@ export const tableInstallManifest: AbrumInstallAppOptions = {
         },
         "additionalProperties": true,
         "x-abrum": {
-          "app": "abrum.table",
+          "app": "abrum.database",
           "entity": "row",
-          "schemaName": "abrum.table.row.v1",
+          "schemaName": "abrum.database.row.v1",
           "scope": "room",
           "indexed": [
             "tableKey",
@@ -543,6 +617,22 @@ export const tableInstallManifest: AbrumInstallAppOptions = {
   ],
   "features": [],
   "functions": [
+    {
+      "id": "renameDatabase",
+      "description": "Rename this Database app in its exact Room without changing the Space or any table, column, view or row.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
+      }
+    },
     {
       "id": "listTables",
       "description": "List all tables in this Room with keys, row counts, columns and views.",
@@ -687,6 +777,9 @@ export const tableInstallManifest: AbrumInstallAppOptions = {
           },
           "confirm": {
             "type": "boolean"
+          },
+          "expectedLineageCid": {
+            "type": "string"
           }
         },
         "required": [
@@ -915,7 +1008,7 @@ export const tableInstallManifest: AbrumInstallAppOptions = {
   "surfaces": [
     {
       "kind": "web",
-      "label": "Table",
+      "label": "Database",
       "entrypoint": "/"
     }
   ],
@@ -923,11 +1016,11 @@ export const tableInstallManifest: AbrumInstallAppOptions = {
   "runtime": {
     "entrypoint": "backend/actions.js",
     "kind": "station-js",
-    "backendDigest": "2c4f219573a8aab3bc6a52075e4763b6"
+    "backendDigest": "d00290e4859ad35b7ea2692e7ac6ca6e"
   },
   "grantedRights": [
     "read",
     "write"
   ]
 };
-export const install = tableInstallManifest;
+export const install = databaseInstallManifest;

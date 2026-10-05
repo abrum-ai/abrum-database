@@ -68,7 +68,7 @@ export function ImageThumb({ value, size = 28, className, fallback }: { value: u
 
 export function Monogram({ text }: { text: string }) {
   const letter = text.trim()[0]?.toUpperCase();
-  return letter ? <span className="text-[0.55em] font-semibold text-foreground/70">{letter}</span> : null;
+  return letter ? <span className="text-micro font-semibold text-foreground/70">{letter}</span> : null;
 }
 
 export function Initials({ name, size = 22 }: { name: string; size?: number }) {
@@ -84,7 +84,7 @@ export function Initials({ name, size = 22 }: { name: string; size?: number }) {
   const color = palette[Math.abs(hash) % palette.length];
   return (
     <span
-      className="inline-grid shrink-0 place-items-center rounded-full text-[10px] font-semibold"
+      className="inline-grid shrink-0 place-items-center rounded-full text-micro font-semibold"
       style={{ width: size, height: size, color, background: `color-mix(in srgb, ${color} 18%, transparent)` }}
     >
       {initials || "?"}

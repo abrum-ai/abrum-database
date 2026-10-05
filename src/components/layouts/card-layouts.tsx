@@ -33,7 +33,7 @@ function Card({ row, title, cover, properties, onOpen, draggable, large }: CardP
     >
       {cover ? (
         <div className={cn("grid place-items-center overflow-hidden border-b bg-muted", large ? "h-40" : "h-28")}>
-          <ImageThumb value={row.values[cover.key]} size={large ? 160 : 112} className="size-full! rounded-none border-0 text-[48px]" fallback={<Monogram text={name} />} />
+          <ImageThumb value={row.values[cover.key]} size={large ? 160 : 112} className="size-full! rounded-none border-0 text-display" fallback={<Monogram text={name} />} />
         </div>
       ) : null}
       <div className="grid gap-2 p-3">
@@ -192,7 +192,7 @@ export function ListLayout({ columns, rows, cardColumns, onOpenRow }: { columns:
           return (
             <li key={row.id}>
               <button type="button" onClick={() => onOpenRow(row.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted/40 sm:px-6">
-                {image ? <ImageThumb value={row.values[image.key]} size={32} className="rounded-md text-[32px]" fallback={<Monogram text={name} />} /> : <FileText className="size-4 text-muted-foreground" />}
+                {image ? <ImageThumb value={row.values[image.key]} size={32} className="rounded-md text-display" fallback={<Monogram text={name} />} /> : <FileText className="size-4 text-muted-foreground" />}
                 <span className={cn("min-w-0 flex-1 truncate font-medium", !name && "text-muted-foreground/60")}>{name || "Untitled"}</span>
                 <span className="hidden min-w-0 items-center gap-4 md:flex">
                   {properties.map((column) =>

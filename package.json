@@ -1,5 +1,5 @@
 {
-  "name": "@abrum/table-web",
+  "name": "@abrum/database-web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -21,10 +21,10 @@
     "test:live": "node --test qa/live.test.mjs"
   },
   "dependencies": {
-    "@abrum/react": "file:vendor/abrum-sdk/abrum-react-0.1.1.tgz",
+    "@abrum/react": "file:vendor/abrum-sdk/abrum-react-0.1.1-0a5c03d328df.tgz",
     "@abrum/runtime": "file:vendor/abrum-sdk/abrum-runtime-0.1.1.tgz",
     "@abrum/wasm": "file:vendor/abrum-sdk/abrum-wasm-0.1.1.tgz",
-    "@abrum/web-runtime": "file:vendor/abrum-sdk/abrum-web-runtime-0.1.1.tgz",
+    "@abrum/web-runtime": "file:vendor/abrum-sdk/abrum-web-runtime-0.1.1-16aad246f079.tgz",
     "@tailwindcss/vite": "^4.1.17",
     "@tanstack/react-table": "^8.21.3",
     "@tanstack/react-virtual": "^3.14.13",
@@ -42,7 +42,7 @@
     "vite": "^7.2.6"
   },
   "devDependencies": {
-    "@abrum/app": "file:vendor/abrum-sdk/abrum-app-0.1.1.tgz",
+    "@abrum/app": "file:vendor/abrum-sdk/abrum-app-0.1.1-5dd581fa1f0b.tgz",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3"
   }

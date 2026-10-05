@@ -20,4 +20,4 @@ The native tools own the lifecycle: `app_scaffold` obtains one Warden authoring 
 
 Test the Station-hosted surfaceRef with Co-Presence view, named actions, waitFor and a frame. Bind controls with affordance and report durable mutation completion with processAffordance. Request the finite test actions once. Use app_run mode=acceptance with testActions to freeze a bundle, test that surface again, then app_provision with evidenceRefs. Build success alone is not UI acceptance.
 
-App id: `abrum.table`.
+App id: `abrum.database`.

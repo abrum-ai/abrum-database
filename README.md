@@ -1,6 +1,6 @@
-# ABRUM Table
+# ABRUM Database
 
-A dynamic table app for ABRUM. Tables, columns and rows are signed twins in the Room; people work with them through a shadcn/ui + TanStack Table interface, agents through tool calls.
+A dynamic database app for ABRUM. Tables, columns and rows are signed twins in the Room; people work with them through a shadcn/ui + TanStack Table interface, agents through tool calls.
 
 ## Data model (twins)
 
